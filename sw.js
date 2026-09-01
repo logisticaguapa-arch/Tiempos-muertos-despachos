@@ -11,7 +11,7 @@
   nunca borra un cargue ni una parada ya guardados.
 */
 
-const CACHE_NOMBRE = 'piloto-guapa-v2';
+const CACHE_NOMBRE = 'piloto-guapa-v5';
 
 const ARCHIVOS_APP_SHELL = [
   './',

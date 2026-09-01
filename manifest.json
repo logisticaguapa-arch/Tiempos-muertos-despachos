@@ -1,6 +1,6 @@
 {
-  "name": "Piloto Cosecha Guapa",
-  "short_name": "Cosecha Guapa",
+  "name": "Piloto Despachos Guapa",
+  "short_name": "Despachos Guapa",
   "description": "Registro operativo de cargues, paradas y descargues de canastas — Agrícola Guapa.",
   "start_url": "./index.html",
   "scope": "./",

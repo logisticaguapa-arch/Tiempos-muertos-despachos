@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
-  <title>Cosecha Guapa — Piloto</title>
+  <title>Despachos Guapa — Piloto</title>
 
   <!-- FASE N13 — hace que la app se pueda "Instalar" desde el navegador (ícono propio, pantalla
        completa, funciona sin internet tras la primera visita) y sea reconocible por PWABuilder u otra
@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="./icons/icon-180.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Cosecha Guapa" />
+  <meta name="apple-mobile-web-app-title" content="Despachos Guapa" />
 
   <link rel="stylesheet" href="./css/estilos.css" />
 </head>
@@ -24,7 +24,7 @@
   <section id="pantalla-login" class="pantalla">
     <div class="tarjeta-login">
       <h1>Agrícola Guapa</h1>
-      <p class="subtitulo">Piloto operativo — Cosecha</p>
+      <p class="subtitulo">Piloto operativo — Despachos</p>
 
       <form id="form-login">
         <label for="campo-usuario">Usuario</label>
@@ -102,6 +102,19 @@
         </div>
         <p id="mensaje-respaldo" class="mensaje-error" hidden></p>
         <p id="mensaje-respaldo-ok" class="mensaje-ok" hidden></p>
+
+        <h3 class="titulo-herramientas">Antes de arrancar producción</h3>
+        <p class="nota-fase">
+          Borra el historial operativo (cargues, paradas, checklist y descargues) guardado en ESTE
+          celular — pensado para limpiar los datos de prueba antes de empezar a usar la app en serio. No
+          toca tus catálogos (clientes, vehículos, conductores, etc.) ni lo que ya subiste a Google
+          Sheets.
+        </p>
+        <div class="acciones-respaldo">
+          <button id="boton-borrar-prueba" class="boton-peligro">🗑 Borrar datos de prueba</button>
+        </div>
+        <p id="mensaje-borrar-prueba" class="mensaje-error" hidden></p>
+        <p id="mensaje-borrar-prueba-ok" class="mensaje-ok" hidden></p>
       </div>
     </footer>
   </section>
