@@ -1,0 +1,655 @@
+/* FASE N1 — estilos mínimos, mobile-first. Sin frameworks, igual que el resto del proyecto. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  background: #f4f6f5;
+  color: #1c2a22;
+}
+
+.pantalla { min-height: 100vh; }
+
+/* CORRECCIÓN (detectada en la Fase N6): cada pantalla define su propio "display" (flex, block…) con un
+   selector de ID, que tiene más especificidad que la regla del navegador para [hidden] { display: none }.
+   Sin esta línea, mostrarPantalla() en app.js SÍ pone/quita el atributo hidden correctamente, pero las
+   pantallas ocultas seguían renderizándose visualmente apiladas una encima de otra — un bug real que las
+   pruebas automáticas no habían detectado porque solo verificaban el atributo hidden en el DOM, nunca el
+   estilo calculado. El !important es intencional: "hidden" siempre debe ganar, sin excepción.  */
+[hidden] { display: none !important; }
+
+/* ---- Login ---- */
+#pantalla-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.tarjeta-login {
+  width: 100%;
+  max-width: 360px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 28px 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.tarjeta-login h1 {
+  margin: 0 0 2px 0;
+  font-size: 22px;
+  color: #1c6b3a;
+}
+
+.subtitulo {
+  margin: 0 0 20px 0;
+  color: #5b6b60;
+  font-size: 14px;
+}
+
+label {
+  display: block;
+  margin: 14px 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+input[type="text"], input[type="password"], input[type="time"], input[type="date"], input[type="number"], input[type="url"], textarea, select {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px; /* evita zoom automático en iOS */
+  border: 1px solid #cfd8d2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.boton-primario {
+  width: 100%;
+  margin-top: 22px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  background: #1c6b3a;
+  border: none;
+  border-radius: 8px;
+}
+
+.boton-primario:active { background: #144e2a; }
+
+.boton-texto {
+  background: none;
+  border: none;
+  color: #1c6b3a;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px;
+}
+
+.mensaje-error {
+  margin-top: 12px;
+  color: #b3261e;
+  font-size: 14px;
+  text-align: center;
+}
+
+.mensaje-ok {
+  margin-top: 12px;
+  color: #1c6b3a;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ---- Pantalla principal ---- */
+.encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: #1c6b3a;
+  color: #fff;
+}
+.encabezado h1 { margin: 0; font-size: 17px; white-space: nowrap; }
+.encabezado .boton-texto { color: #fff; }
+.acciones-encabezado { display: flex; gap: 0; align-items: center; }
+.acciones-encabezado .boton-texto { font-size: 12px; padding: 8px 5px; white-space: nowrap; }
+
+.aviso-vacio {
+  padding: 32px 20px;
+  text-align: center;
+  color: #5b6b60;
+}
+.nota-fase { font-size: 13px; color: #8a978f; }
+
+.pie-diagnostico { padding: 16px; text-align: center; }
+#panel-catalogos {
+  margin-top: 12px;
+  text-align: left;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+}
+#panel-catalogos ul { margin: 0; padding-left: 18px; }
+
+.acciones-respaldo {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 18px;
+}
+.acciones-respaldo .boton-secundario { flex: 1; max-width: 160px; }
+
+/* ---- Lista de cargues activos ---- */
+.contenedor-lista { padding: 12px 16px 90px 16px; }
+
+.lista-cargues { list-style: none; margin: 0; padding: 0; }
+
+.tarjeta-cargue {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  font-family: inherit;
+}
+
+.tarjeta-cargue .fila-superior {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.tarjeta-cargue .placa { font-size: 17px; font-weight: 700; }
+
+.tarjeta-cargue .cliente-destino { color: #4a5750; font-size: 14px; }
+
+.etiqueta-estado {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #6b7d72; /* por defecto: PENDIENTE / CHECKLIST / APROBADO */
+}
+.etiqueta-estado.en-cargue { background: #1c6b3a; }
+.etiqueta-estado.en-parada { background: #b3701e; }
+.etiqueta-estado.rechazado { background: #b3261e; }
+.etiqueta-estado.finalizado { background: #3a5a6b; }
+
+/* ---- Botón flotante "+" ---- */
+.boton-flotante {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #1c6b3a;
+  color: #fff;
+  font-size: 30px;
+  line-height: 58px;
+  text-align: center;
+  border: none;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  padding: 0;
+}
+
+/* ---- Formularios (Nuevo cargue, etc.) ---- */
+.formulario { padding: 16px; max-width: 480px; margin: 0 auto; }
+
+.bloque-agregar-rapido {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.bloque-agregar-rapido input { flex: 1; }
+
+.boton-secundario {
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1c6b3a;
+  background: #e7f1ea;
+  border: 1px solid #1c6b3a;
+  border-radius: 8px;
+}
+
+.contenido-detalle {
+  padding: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.contenido-detalle .fila {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #e3e8e5;
+}
+.contenido-detalle .fila span:first-child { color: #5b6b60; }
+.contenido-detalle .fila span:last-child { font-weight: 600; }
+
+/* ---- Checklist (Fase N3) ---- */
+.seccion-checklist { margin-top: 8px; }
+.seccion-checklist h2 {
+  font-size: 16px;
+  margin: 0 0 12px 0;
+  color: #1c6b3a;
+}
+
+.item-checklist {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.item-checklist .texto-item {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.opciones-respuesta {
+  display: flex;
+  gap: 8px;
+}
+.boton-opcion {
+  flex: 1;
+  padding: 10px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4a5750;
+  background: #eef1ef;
+  border: 1px solid #d5dcd8;
+  border-radius: 8px;
+}
+.boton-opcion.seleccionada {
+  background: #1c6b3a;
+  border-color: #1c6b3a;
+  color: #fff;
+}
+
+.campo-observacion-item {
+  width: 100%;
+  margin-top: 10px;
+  min-height: 60px;
+  resize: vertical;
+}
+
+#boton-finalizar-checklist { margin-top: 4px; }
+
+/* ---- Checklist ya finalizado (solo lectura) ---- */
+.checklist-solo-lectura {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.item-checklist-lectura {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e3e8e5;
+  font-size: 14px;
+}
+.item-checklist-lectura:last-child { border-bottom: none; }
+.item-checklist-lectura .valor-respuesta { font-weight: 700; color: #1c6b3a; }
+.item-checklist-lectura .observacion-lectura {
+  flex-basis: 100%;
+  margin: 0;
+  color: #5b6b60;
+  font-size: 13px;
+}
+
+/* ---- Tiempos y paradas (Fase N4) ---- */
+.seccion-tiempos { margin-top: 8px; }
+.seccion-tiempos h2 {
+  font-size: 16px;
+  margin: 0 0 12px 0;
+  color: #1c6b3a;
+}
+.seccion-tiempos h3 {
+  font-size: 14px;
+  margin: 18px 0 10px 0;
+  color: #4a5750;
+}
+
+.fila-hora {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.fila-hora input { flex: 1; }
+.fila-hora .boton-secundario { flex: 0 0 auto; }
+
+.formulario-parada {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.aviso-sin-paradas {
+  color: #5b6b60;
+  font-size: 14px;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.fila-parada {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.fila-parada-abierta { border: 1px solid #b3701e; }
+.fila-parada-encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.causa-parada { font-weight: 700; font-size: 14px; }
+.duracion-parada { font-weight: 700; color: #1c6b3a; font-size: 13px; }
+.detalle-parada { color: #5b6b60; font-size: 13px; margin-top: 2px; }
+.observacion-parada { margin: 6px 0 0 0; font-size: 13px; color: #4a5750; }
+
+.mensaje-confirmacion {
+  background: #e7f1ea;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0 0 14px 0;
+  font-weight: 600;
+}
+
+.acciones-fila-parada {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #e3e8e5;
+}
+.boton-enlace {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c6b3a;
+}
+.boton-enlace-peligro { color: #b3261e; }
+#boton-cancelar-parada.boton-enlace-peligro {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin-top: 10px;
+}
+
+/* ---- Indicadores (Fase N6) ---- */
+.etiqueta-filtro {
+  margin: 4px 0 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5750;
+}
+#campo-filtro-periodo { margin-bottom: 16px; }
+
+.aviso-vacio-inline {
+  text-align: center;
+  color: #5b6b60;
+  font-size: 14px;
+  padding: 20px 0;
+}
+
+.fila-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.tarjeta-kpi {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 10px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.valor-kpi { font-size: 22px; font-weight: 700; color: #1c6b3a; }
+.etiqueta-kpi { font-size: 12px; color: #5b6b60; }
+
+.fila-ranking { margin-bottom: 14px; }
+.fila-ranking:last-child { margin-bottom: 0; }
+.fila-ranking-encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.causa-ranking { font-weight: 600; color: #1c2a22; }
+.valor-ranking { color: #5b6b60; white-space: nowrap; }
+.barra-fondo {
+  background: #e3e8e5;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+}
+.barra-relleno {
+  background: #1c6b3a;
+  height: 100%;
+  border-radius: 4px;
+}
+
+/* ---- Fase N11: ajustes reales del piloto ---- */
+
+/* Fecha + hora en dos campos separados (reemplaza datetime-local) — más fácil de tocar en el celular
+   que un único control combinado, que en varios Android se veía como un solo desplegable incómodo. */
+.fila-fecha-hora {
+  display: flex;
+  gap: 8px;
+}
+.fila-fecha-hora .campo-fecha { flex: 3; }
+.fila-fecha-hora .campo-hora { flex: 2; }
+.fila-fecha-hora label { margin-top: 0; }
+.boton-ahora-fecha-hora {
+  width: 100%;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+/* Selector "+": Cargue o Descargue de canastas */
+.overlay-selector {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 42, 34, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 10;
+}
+.tarjeta-selector {
+  width: 100%;
+  max-width: 340px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 22px 20px;
+}
+.tarjeta-selector h2 {
+  margin: 0 0 16px 0;
+  font-size: 17px;
+  text-align: center;
+  color: #1c6b3a;
+}
+.tarjeta-selector .boton-primario,
+.tarjeta-selector .boton-secundario {
+  margin: 0 0 10px 0;
+}
+.tarjeta-selector .boton-enlace {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+/* Pestañas Cargue / Paradas dentro del detalle de un cargue en curso */
+.tabs-tiempos {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.tab-tiempos {
+  flex: 1;
+  padding: 10px 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #4a5750;
+  background: #eef1ef;
+  border: 1px solid #d5dcd8;
+  border-radius: 8px;
+}
+.tab-tiempos.activa {
+  background: #1c6b3a;
+  border-color: #1c6b3a;
+  color: #fff;
+}
+
+.fila-superior-resumen {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.fila-superior-resumen h2 { margin: 0; }
+
+/* Panel "Herramientas" (agrupa lo que antes estaba suelto en la pantalla principal) */
+.titulo-herramientas {
+  font-size: 14px;
+  color: #4a5750;
+  text-align: center;
+  margin: 18px 0 4px 0;
+}
+#panel-herramientas { margin-top: 10px; }
+
+.subtitulo-historial {
+  font-size: 15px;
+  color: #1c6b3a;
+  margin: 22px 0 10px 0;
+}
+
+.etiqueta-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 14px 0 4px 0;
+}
+.etiqueta-checkbox input { width: auto; }
+
+/* ---------------------------------------------------------------------------------------------------
+   FASE N12 — ajustes reales del piloto: destino en descargue, confirmación al guardar, tablero
+   operativo (gráfica por día + comparativos) e informe en PDF vía impresión.
+--------------------------------------------------------------------------------------------------- */
+
+.fila-filtro-tablero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fila-filtro-tablero .boton-secundario { white-space: nowrap; }
+
+/* Gráfica de barras verticales — cargues finalizados por día. Se hace scroll horizontal si hay más días
+   de los que caben en la pantalla del celular (no se recorta ni se aplasta). */
+.grafica-barras-dias {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px 2px 0 2px;
+  min-height: 130px;
+}
+.barra-dia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 32px;
+}
+.barra-dia-valor {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1c6b3a;
+  height: 14px;
+}
+.barra-dia-columna {
+  width: 18px;
+  height: 90px;
+  display: flex;
+  align-items: flex-end;
+  background: #eef1ef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.barra-dia-relleno {
+  width: 100%;
+  background: #1c6b3a;
+  border-radius: 4px 4px 0 0;
+}
+.barra-dia-etiqueta {
+  font-size: 10px;
+  color: #6b7a71;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+/* Encabezado que SOLO aparece al imprimir/generar el PDF del tablero (ver @media print más abajo) */
+.encabezado-impresion { display: none; }
+
+@media print {
+  /* Al imprimir (o "Guardar como PDF") solo debe verse el contenido del tablero — nada de menús,
+     botones ni pantallas ocultas de la app. */
+  body * { visibility: hidden; }
+  #pantalla-indicadores, #pantalla-indicadores * { visibility: visible; }
+  #pantalla-indicadores {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+  }
+  #pantalla-indicadores .encabezado,
+  #pantalla-indicadores .fila-filtro-tablero,
+  #boton-generar-pdf-tablero {
+    display: none !important;
+  }
+  .encabezado-impresion {
+    display: block;
+    margin-bottom: 12px;
+  }
+  .encabezado-impresion h1 {
+    font-size: 18px;
+    color: #1c6b3a;
+    margin: 0 0 4px 0;
+  }
+  .encabezado-impresion p {
+    font-size: 12px;
+    color: #4a5750;
+    margin: 0 0 10px 0;
+  }
+  .formulario-parada { break-inside: avoid; }
+}
