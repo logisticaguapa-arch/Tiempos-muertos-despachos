@@ -22,6 +22,8 @@ const NOMBRES_TABLAS_RESPALDO = [
   'cargues',
   'paradas',
   'checklistRespuestas',
+  'descargues', // FASE N15 — corrección: esta tabla existe desde la Fase N11 pero nunca se agregó aquí,
+  // así que ningún respaldo generado hasta ahora incluía los descargues de canastas. Se corrige acá.
   'config',
 ];
 
@@ -97,11 +99,38 @@ async function restaurarDesdeArchivo(objeto) {
   const tablas = NOMBRES_TABLAS_RESPALDO.map((nombre) => db[nombre]);
   await db.transaction('rw', tablas, async () => {
     for (const nombre of NOMBRES_TABLAS_RESPALDO) {
-      await db[nombre].clear();
       const filas = objeto.datos[nombre];
-      if (Array.isArray(filas) && filas.length) {
+      // FASE N15 — si el respaldo es de ANTES de que existiera esta tabla (p.ej. uno viejo, de antes de
+      // agregar "descargues" en la Fase N11, o de antes de esta misma corrección), la llave ni siquiera
+      // existe en el archivo. En ese caso no se toca la tabla — antes esto la vaciaba igual y la dejaba
+      // vacía para siempre, borrando datos que el respaldo nunca tuvo la intención de tocar.
+      if (!Array.isArray(filas)) continue;
+      await db[nombre].clear();
+      if (filas.length) {
         await db[nombre].bulkAdd(filas);
       }
+    }
+  });
+}
+
+// ---- FASE N15 — Borrar datos operativos de prueba (antes de arrancar producción) ----------------------
+//
+// Deliberadamente NO toca los catálogos (clientes, destinos, vehículos, conductores, causas, etc.) ni
+// `config` (que guarda el enlace de Google Sheets y la sesión) — esos se conservan. Solo borra el
+// HISTORIAL operativo: cargues, paradas, checklist respondido y descargues de canastas. No borra nada de
+// lo que ya se subió a Google Sheets (eso se limpia aparte, directamente en la hoja).
+const NOMBRES_TABLAS_DATOS_OPERATIVOS = ['cargues', 'paradas', 'checklistRespuestas', 'descargues'];
+
+async function contarDatosOperativos() {
+  const cantidades = await Promise.all(NOMBRES_TABLAS_DATOS_OPERATIVOS.map((nombre) => db[nombre].count()));
+  return cantidades.reduce((total, n) => total + n, 0);
+}
+
+async function borrarDatosOperativos() {
+  const tablas = NOMBRES_TABLAS_DATOS_OPERATIVOS.map((nombre) => db[nombre]);
+  await db.transaction('rw', tablas, async () => {
+    for (const nombre of NOMBRES_TABLAS_DATOS_OPERATIVOS) {
+      await db[nombre].clear();
     }
   });
 }

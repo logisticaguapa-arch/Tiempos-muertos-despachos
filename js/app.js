@@ -1559,6 +1559,46 @@ async function iniciar() {
     }
   });
 
+  // ---- Borrar datos de prueba antes de producción (Fase N15) ----
+  // Doble confirmación a propósito: es la acción más destructiva de todo el panel de Herramientas (borra
+  // TODO el historial operativo de este celular) y no tiene forma de deshacerse salvo restaurando un
+  // respaldo anterior.
+  el('boton-borrar-prueba').addEventListener('click', async () => {
+    const mensajeError = el('mensaje-borrar-prueba');
+    const mensajeOk = el('mensaje-borrar-prueba-ok');
+    mensajeError.hidden = true;
+    mensajeOk.hidden = true;
+
+    try {
+      const cantidad = await contarDatosOperativos();
+      if (cantidad === 0) {
+        mensajeOk.textContent = 'Este celular ya no tiene cargues, paradas, checklist ni descargues guardados.';
+        mensajeOk.hidden = false;
+        return;
+      }
+
+      const primeraConfirmacion = window.confirm(
+        `Este celular tiene ${cantidad} registros operativos guardados (cargues, paradas, checklist y descargues). ` +
+          `Esto los borra TODOS de este celular — no se puede deshacer, salvo restaurando un respaldo anterior. ` +
+          `No afecta tus catálogos (clientes, vehículos, etc.) ni lo que ya subiste a Google Sheets. ¿Continuar?`,
+      );
+      if (!primeraConfirmacion) return;
+
+      const segundaConfirmacion = window.confirm(
+        'Última confirmación: se van a borrar TODOS los cargues, paradas, checklist y descargues de este celular. ¿Estás seguro?',
+      );
+      if (!segundaConfirmacion) return;
+
+      await borrarDatosOperativos();
+      mensajeOk.textContent = 'Listo: se borraron los datos de prueba de este celular. Queda lista para producción.';
+      mensajeOk.hidden = false;
+      setTimeout(() => location.reload(), 1200);
+    } catch (error) {
+      mensajeError.textContent = error.message || 'No se pudieron borrar los datos.';
+      mensajeError.hidden = false;
+    }
+  });
+
   // ---- Google Sheets: ahora se sincroniza SOLO tras cada acción (Fase N11) — aquí solo queda
   // configurar el enlace y, para cuando algo falló, un botón de reintento manual dentro de Herramientas.
   await mostrarEstadoSheets();

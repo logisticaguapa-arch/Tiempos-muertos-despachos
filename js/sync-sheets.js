@@ -78,11 +78,17 @@ function minutosDeSegundos(segundos) {
 
 // ---- Construcción de filas — mismo orden de columnas siempre, para que la hoja tenga encabezados fijos --
 
-async function construirFilasCargues() {
+// FASE N16 — se calcula UNA sola vez por sincronización y se reutiliza en Paradas y Checklist (además
+// de Cargues) para que esas dos pestañas lleven "fecha" y "placa" del cargue al que pertenecen — sin
+// esto, una parada o una respuesta de checklist en la hoja solo traía el `cargue_id`, un número que no
+// dice nada por sí solo a quien revisa la hoja desde un computador sin abrir la app.
+async function _obtenerCarguesConDetalle() {
   const cargues = await db.cargues.toArray();
-  const conDetalle = await _cargesConDetalle(cargues); // reutiliza el mismo cruce de cargues.js
+  return _cargesConDetalle(cargues); // reutiliza el mismo cruce de cargues.js
+}
 
-  return conDetalle.map((c) => ({
+async function construirFilasCargues(carguesConDetalle) {
+  return carguesConDetalle.map((c) => ({
     id: c.id,
     fecha: c.fecha,
     cliente: c.clienteNombre,
@@ -104,38 +110,50 @@ async function construirFilasCargues() {
   }));
 }
 
-async function construirFilasParadas() {
+async function construirFilasParadas(carguesConDetalle) {
+  const carguePorId = Object.fromEntries(carguesConDetalle.map((c) => [c.id, c]));
   const paradas = await db.paradas.toArray();
   paradas.sort((a, b) => new Date(a.horaInicio) - new Date(b.horaInicio));
 
-  return paradas.map((p) => ({
-    id: p.id,
-    cargue_id: p.cargueId,
-    categoria: p.categoriaNombreSnapshot,
-    causa: p.causaNombreSnapshot,
-    responsable: p.responsableNombreSnapshot,
-    tipo_tiempo: p.tipoTiempoNombreSnapshot,
-    hora_inicio: formatearFechaHoraLocal(p.horaInicio),
-    hora_fin: formatearFechaHoraLocal(p.horaFin),
-    duracion_min: minutosDeSegundos(p.duracionSegundos),
-    observaciones: p.observaciones || '',
-    descripcion_otros: p.descripcionOtros || '',
-  }));
+  return paradas.map((p) => {
+    const cargue = carguePorId[p.cargueId];
+    return {
+      id: p.id,
+      cargue_id: p.cargueId,
+      fecha: cargue?.fecha || '',
+      placa: cargue?.placa || '',
+      categoria: p.categoriaNombreSnapshot,
+      causa: p.causaNombreSnapshot,
+      responsable: p.responsableNombreSnapshot,
+      tipo_tiempo: p.tipoTiempoNombreSnapshot,
+      hora_inicio: formatearFechaHoraLocal(p.horaInicio),
+      hora_fin: formatearFechaHoraLocal(p.horaFin),
+      duracion_min: minutosDeSegundos(p.duracionSegundos),
+      observaciones: p.observaciones || '',
+      descripcion_otros: p.descripcionOtros || '',
+    };
+  });
 }
 
-async function construirFilasChecklist() {
+async function construirFilasChecklist(carguesConDetalle) {
+  const carguePorId = Object.fromEntries(carguesConDetalle.map((c) => [c.id, c]));
   const respuestas = await db.checklistRespuestas.toArray();
   respuestas.sort((a, b) => a.cargueId - b.cargueId || a.ordenSnapshot - b.ordenSnapshot);
 
-  return respuestas.map((r) => ({
-    id: r.id,
-    cargue_id: r.cargueId,
-    orden: r.ordenSnapshot,
-    item: r.textoSnapshot,
-    critico: r.criticoSnapshot ? 'Sí' : 'No',
-    respuesta: ETIQUETA_RESPUESTA_CHECKLIST[r.respuesta] || r.respuesta || '',
-    observacion: r.observacion || '',
-  }));
+  return respuestas.map((r) => {
+    const cargue = carguePorId[r.cargueId];
+    return {
+      id: r.id,
+      cargue_id: r.cargueId,
+      fecha: cargue?.fecha || '',
+      placa: cargue?.placa || '',
+      orden: r.ordenSnapshot,
+      item: r.textoSnapshot,
+      critico: r.criticoSnapshot ? 'Sí' : 'No',
+      respuesta: ETIQUETA_RESPUESTA_CHECKLIST[r.respuesta] || r.respuesta || '',
+      observacion: r.observacion || '',
+    };
+  });
 }
 
 async function construirFilasDescargues() {
@@ -170,10 +188,11 @@ async function sincronizarConSheets() {
     throw new Error('Todavía no configuras el enlace de Google Sheets. Usa "Configurar enlace" primero.');
   }
 
+  const carguesConDetalle = await _obtenerCarguesConDetalle();
   const [cargues, paradas, checklist, descargues] = await Promise.all([
-    construirFilasCargues(),
-    construirFilasParadas(),
-    construirFilasChecklist(),
+    construirFilasCargues(carguesConDetalle),
+    construirFilasParadas(carguesConDetalle),
+    construirFilasChecklist(carguesConDetalle),
     construirFilasDescargues(),
   ]);
   const payload = { app: 'piloto-guapa', enviadoEn: new Date().toISOString(), cargues, paradas, checklist, descargues };
