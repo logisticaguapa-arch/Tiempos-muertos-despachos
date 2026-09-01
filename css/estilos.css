@@ -223,6 +223,18 @@ input[type="text"], input[type="password"], input[type="time"], input[type="date
   border-radius: 8px;
 }
 
+/* FASE N15 — variante roja para acciones destructivas (hoy: borrar datos de prueba) */
+.boton-peligro {
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #b3261e;
+  background: #f7e6e2;
+  border: 1px solid #b3261e;
+  border-radius: 8px;
+}
+.acciones-respaldo .boton-peligro { flex: 1; max-width: 220px; }
+
 .contenido-detalle {
   padding: 16px;
   max-width: 480px;
