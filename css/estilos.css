@@ -564,6 +564,16 @@ input[type="text"], input[type="password"], input[type="time"], input[type="date
   margin: 22px 0 10px 0;
 }
 
+/* FASE N19 — secciones "En otros dispositivos" (pantalla principal e historial) */
+.fila-titulo-otros-dispositivos {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.fila-titulo-otros-dispositivos .subtitulo-historial { margin: 22px 0 0 0; }
+.fila-titulo-otros-dispositivos .boton-enlace { margin: 22px 0 0 0; white-space: nowrap; }
+
 .etiqueta-checkbox {
   display: flex;
   align-items: center;
