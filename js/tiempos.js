@@ -137,6 +137,7 @@ async function registrarParada(cargueId, { causaId, horaInicioLocalStr, observac
 
   await db.transaction('rw', [db.paradas, db.cargues], async () => {
     await db.paradas.add({
+      idGlobal: generarIdGlobal(), // FASE N19 — ver db.js
       cargueId,
       causaId: causa.id,
       causaNombreSnapshot: causa.nombre,

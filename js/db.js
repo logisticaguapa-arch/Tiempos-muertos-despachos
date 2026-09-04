@@ -52,6 +52,43 @@ db.version(2).stores({
 });
 
 // ---------------------------------------------------------------------------------------------------
+// FASE N19 — "idGlobal": identificador ÚNICO ENTRE TODOS LOS DISPOSITIVOS para cargues, paradas,
+// respuestas de checklist y descargues.
+//
+// Por qué hace falta: el "id" de arriba (++id) lo genera Dexie EN CADA CELULAR, empezando en 1 —
+// así que el primer cargue que registre el celular A y el primer cargue que registre el celular B
+// tienen AMBOS id=1, cada uno en su propia base de datos local. Eso nunca fue un problema mientras
+// Google Sheets solo recibía datos (Fase N10/N11): pero para FASE N18/N19 (leer lo que subieron los
+// demás dispositivos y mezclarlo en pantalla) ese "id" repetido es un problema serio — Code.gs hace
+// upsert por "id" en la hoja, así que sin esto, el cargue #1 del celular B pisaría silenciosamente
+// la fila del cargue #1 del celular A la próxima vez que B sincronice.
+//
+// La solución: además del "id" local (++id, el que usa Dexie internamente y el que usan las relaciones
+// dentro de ESTE MISMO celular, como paradas.cargueId), cada registro que se sube a Sheets guarda un
+// "idGlobal" propio, generado con hora + un número al azar — con esa combinación, dos celulares
+// generando un idGlobal en el mismo milisegundo tendrían que además coincidir en la parte al azar para
+// chocar (prácticamente imposible). Es lo mismo que se subirá como "id" a Google Sheets (ver
+// sync-sheets.js) de ahora en adelante, en vez del "id" local.
+function generarIdGlobal() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// Le pone "idGlobal" a los registros que ya existían ANTES de este cambio (cargues/paradas/respuestas de
+// checklist/descargues creados con versiones anteriores de la app, que todavía no tienen ese campo).
+// Corre una sola vez por celular de forma efectiva: solo toca los registros que de verdad les falta el
+// campo, así que en cualquier arranque posterior no encuentra nada que migrar y no hace ninguna escritura.
+async function migrarIdsGlobalesSiHaceFalta() {
+  const tablas = [db.cargues, db.paradas, db.checklistRespuestas, db.descargues];
+  for (const tabla of tablas) {
+    await tabla
+      .filter((registro) => !registro.idGlobal)
+      .modify((registro) => {
+        registro.idGlobal = generarIdGlobal();
+      });
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------
 // CATÁLOGOS SEMILLA — mismos valores reales del proyecto anterior, sin inventar ni corregir nada.
 // ---------------------------------------------------------------------------------------------------
 

@@ -7,6 +7,41 @@ function el(id) {
   return document.getElementById(id);
 }
 
+// FASE N17 — pide al navegador que NO borre los datos de esta app bajo presión de almacenamiento (ver
+// docs/PROPUESTA_ARQUITECTURA_PILOTO_SIMPLE.md, sección 16, riesgo 2: sin esto, el sistema operativo del
+// celular podría limpiar solo el almacenamiento del navegador si anda corto de espacio). NO es una
+// garantía total — el respaldo (⚙ Herramientas → Copia de seguridad) sigue siendo la única protección
+// completa, porque esto no evita que alguien borre los datos del navegador a mano, ni que el celular se
+// pierda o se dañe — pero reduce el riesgo de una limpieza automática sin que nadie la pida.
+let almacenamientoPersistente = null; // null = navegador no lo soporta / no se pudo consultar
+
+async function solicitarAlmacenamientoPersistente() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) {
+      almacenamientoPersistente = null;
+    } else {
+      const yaPersistente = await navigator.storage.persisted();
+      almacenamientoPersistente = yaPersistente || (await navigator.storage.persist());
+    }
+  } catch (error) {
+    almacenamientoPersistente = null;
+  }
+  mostrarEstadoAlmacenamiento();
+  return almacenamientoPersistente;
+}
+
+function mostrarEstadoAlmacenamiento() {
+  const nota = el('estado-almacenamiento');
+  if (!nota) return;
+  if (almacenamientoPersistente === true) {
+    nota.textContent = '✓ El navegador protegió estos datos contra limpieza automática por poco espacio.';
+  } else if (almacenamientoPersistente === false) {
+    nota.textContent = 'El navegador no otorgó esta protección extra — el respaldo periódico sigue siendo importante.';
+  } else {
+    nota.textContent = ''; // no soportado en este navegador (p.ej. iOS Safari) — no se muestra nada, no es un error
+  }
+}
+
 // ---------------------------------------------------------------------------------------------------
 // FECHA + HORA "fácil de digitar" (Fase N11) — reemplaza el <input type="datetime-local"> único (que en
 // varios celulares Android se ve como un solo control desplegable, incómodo de tocar) por DOS campos
@@ -90,7 +125,18 @@ async function mostrarEstadoSheets() {
   nota.textContent = 'Enlace configurado. Se sincroniza solo con cada acción guardada.';
 }
 
+const PANTALLAS_CON_OTROS_DISPOSITIVOS = ['pantalla-principal', 'pantalla-historial'];
+
 function mostrarPantalla(idPantalla) {
+  // FASE N19 — "Cargues activos" e "Historial" se refrescan solas con lo de otros dispositivos mientras
+  // quedan abiertas (ver iniciarAutoRefrescoCompartidoSiHaceFalta más abajo); al navegar a CUALQUIER otra
+  // pantalla ese refresco automático debe apagarse, si no seguiría llamando a Google Sheets de fondo
+  // aunque el supervisor ya ni esté viendo esas pantallas.
+  if (PANTALLAS_CON_OTROS_DISPOSITIVOS.includes(idPantalla)) {
+    iniciarAutoRefrescoCompartidoSiHaceFalta();
+  } else {
+    detenerAutoRefrescoCompartido();
+  }
   document.querySelectorAll('.pantalla').forEach((p) => p.setAttribute('hidden', ''));
   el(idPantalla).removeAttribute('hidden');
 }
@@ -171,6 +217,7 @@ async function iniciarPantallaPrincipal() {
   mostrarPantalla('pantalla-principal');
   await renderizarListaCargues();
   dispararSincronizacionSheets(); // intento silencioso al abrir/volver a la pantalla principal (Fase N11)
+  actualizarOtrosDispositivosActivos(); // FASE N19 — no se espera, no debe demorar la lista local
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -350,6 +397,7 @@ async function abrirPantallaHistorial() {
   mostrarPantalla('pantalla-historial');
   await renderizarListaHistorial();
   await renderizarListaDescarguesHistorial();
+  actualizarOtrosDispositivosHistorial(); // FASE N19 — no se espera, no debe demorar las listas locales
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -533,6 +581,126 @@ async function abrirPantallaIndicadores() {
 // CSS de impresión (@media print en estilos.css) oculta todo lo que no sea el tablero mismo.
 function generarPdfTablero() {
   window.print();
+}
+
+// ---------------------------------------------------------------------------------------------------
+// "EN OTROS DISPOSITIVOS" (Fase N19) — mezclado directo en Cargues activos e Historial, ver
+// js/consolidado.js y obtenerDatosCompartidos() en sync-sheets.js. Es de SOLO LECTURA: aquí no se crea
+// ni edita nada — lo que un supervisor registra se sigue guardando únicamente en su propio celular.
+// ---------------------------------------------------------------------------------------------------
+
+let _intervaloAutoRefrescoCompartido = null;
+const AUTO_REFRESCO_COMPARTIDO_MS = 60000; // 1 minuto — se acerca a "en línea" sin exagerar las llamadas al enlace de Apps Script
+
+async function _idsGlobalesLocales(tabla) {
+  const registros = await tabla.toArray();
+  return new Set(registros.map((r) => r.idGlobal).filter(Boolean));
+}
+
+function renderizarFilaCargueCompartido(c) {
+  const activo = esEstadoActivoCompartido(c.estado);
+  return `
+    <li>
+      <div class="tarjeta-cargue">
+        <div class="fila-superior">
+          <span class="placa">${c.placa || '—'}</span>
+          <span class="etiqueta-estado ${claseEstadoConsolidado(c.estado)}">${c.estado || '—'}</span>
+        </div>
+        <div class="cliente-destino">${c.cliente || ''} — ${c.destino_ciudad || ''} · ${c.fecha || ''}</div>
+        ${
+          !activo
+            ? `<div class="cliente-destino">Tiempo total: ${formatearDuracion((Number(c.tiempo_total_min) || 0) * 60)} · Detenido: ${formatearDuracion((Number(c.tiempo_detenido_min) || 0) * 60)}</div>`
+            : ''
+        }
+      </div>
+    </li>`;
+}
+
+function renderizarFilaDescargueCompartido(d) {
+  return `
+    <li>
+      <div class="tarjeta-cargue">
+        <div class="fila-superior">
+          <span class="placa">${d.placa || '—'}</span>
+          <span class="etiqueta-estado">${formatearDuracion((Number(d.duracion_min) || 0) * 60)}</span>
+        </div>
+        <div class="cliente-destino">${d.cliente_origen || ''} — ${d.destino_origen || ''} · ${d.fecha || ''}${d.remision ? ' · Rem. ' + d.remision : ''}</div>
+      </div>
+    </li>`;
+}
+
+// Trae de Sheets y muestra en "Cargues activos" lo que registraron OTROS dispositivos. Nunca interrumpe
+// ni bloquea la pantalla local: si falla (sin señal, enlace todavía no configurado), se calla con un
+// aviso discreto — la lista local (la propia, editable) sigue funcionando exactamente igual, y el
+// próximo refresco automático (o tocar "Actualizar") lo vuelve a intentar solo.
+async function actualizarOtrosDispositivosActivos() {
+  const estado = el('estado-otros-activos');
+  const mensajeError = el('mensaje-error-otros-activos');
+  const lista = el('lista-otros-activos');
+  if (!estado || !mensajeError || !lista) return;
+
+  try {
+    const [datosCompartidos, idsLocales] = await Promise.all([obtenerDatosCompartidos(), _idsGlobalesLocales(db.cargues)]);
+    const otros = carguesActivosDeOtrosDispositivos(datosCompartidos, idsLocales);
+    mensajeError.hidden = true;
+    estado.textContent = otros.length
+      ? `Actualizado: ${new Date().toLocaleString('es-CO')}`
+      : `Ningún otro dispositivo tiene cargues activos ahora mismo (actualizado: ${new Date().toLocaleString('es-CO')}).`;
+    lista.innerHTML = otros.map(renderizarFilaCargueCompartido).join('');
+  } catch (error) {
+    estado.textContent = '';
+    mensajeError.textContent = error.message || 'No se pudo traer lo de otros dispositivos.';
+    mensajeError.hidden = false;
+  }
+}
+
+// Igual que la anterior, pero para "Historial" — cargues terminales + descargues de otros dispositivos.
+async function actualizarOtrosDispositivosHistorial() {
+  const estado = el('estado-otros-historial');
+  const mensajeError = el('mensaje-error-otros-historial');
+  const listaCargues = el('lista-otros-historial-cargues');
+  const listaDescargues = el('lista-otros-historial-descargues');
+  if (!estado || !mensajeError || !listaCargues || !listaDescargues) return;
+
+  try {
+    const [datosCompartidos, idsCarguesLocales, idsDescarguesLocales] = await Promise.all([
+      obtenerDatosCompartidos(),
+      _idsGlobalesLocales(db.cargues),
+      _idsGlobalesLocales(db.descargues),
+    ]);
+    const otrosCargues = carguesHistorialDeOtrosDispositivos(datosCompartidos, idsCarguesLocales);
+    const otrosDescargues = descarguesDeOtrosDispositivos(datosCompartidos, idsDescarguesLocales);
+    mensajeError.hidden = true;
+    estado.textContent =
+      otrosCargues.length || otrosDescargues.length
+        ? `Actualizado: ${new Date().toLocaleString('es-CO')}`
+        : `Ningún otro dispositivo tiene historial todavía (actualizado: ${new Date().toLocaleString('es-CO')}).`;
+    listaCargues.innerHTML = otrosCargues.map(renderizarFilaCargueCompartido).join('');
+    listaDescargues.innerHTML = otrosDescargues.map(renderizarFilaDescargueCompartido).join('');
+  } catch (error) {
+    estado.textContent = '';
+    mensajeError.textContent = error.message || 'No se pudo traer lo de otros dispositivos.';
+    mensajeError.hidden = false;
+  }
+}
+
+function detenerAutoRefrescoCompartido() {
+  if (_intervaloAutoRefrescoCompartido) {
+    clearInterval(_intervaloAutoRefrescoCompartido);
+    _intervaloAutoRefrescoCompartido = null;
+  }
+}
+
+// Un solo intervalo compartido entre "Cargues activos" e "Historial": en cada vuelta revisa cuál de las
+// dos pantallas está abierta en ese momento y refresca solo esa (nunca las dos a la vez). Se arranca la
+// primera vez que se entra a cualquiera de las dos (ver mostrarPantalla) y NO se reinicia si ya estaba
+// corriendo — así seguir yendo y viniendo entre esas pantallas no reinicia el conteo del minuto.
+function iniciarAutoRefrescoCompartidoSiHaceFalta() {
+  if (_intervaloAutoRefrescoCompartido) return;
+  _intervaloAutoRefrescoCompartido = setInterval(() => {
+    if (!el('pantalla-principal').hidden) actualizarOtrosDispositivosActivos();
+    else if (!el('pantalla-historial').hidden) actualizarOtrosDispositivosHistorial();
+  }, AUTO_REFRESCO_COMPARTIDO_MS);
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -1487,8 +1655,11 @@ async function iniciar() {
     }
   });
 
+  solicitarAlmacenamientoPersistente(); // no se espera — corre en paralelo, no debe demorar el arranque
+
   await sembrarCatalogosSiHaceFalta();
   await migrarCatalogoCausasV2SiHaceFalta();
+  await migrarIdsGlobalesSiHaceFalta(); // FASE N19 — ver db.js
 
   if (await haySesionActiva()) {
     await iniciarPantallaPrincipal();
@@ -1692,6 +1863,10 @@ async function iniciar() {
   el('boton-volver-desde-indicadores').addEventListener('click', iniciarPantallaPrincipal);
   el('campo-filtro-periodo').addEventListener('change', () => renderizarIndicadores(el('campo-filtro-periodo').value));
   el('boton-generar-pdf-tablero').addEventListener('click', generarPdfTablero);
+
+  // ---- En otros dispositivos (Fase N19) — botones "Actualizar" manuales, además del refresco automático ----
+  el('boton-actualizar-otros-activos').addEventListener('click', () => actualizarOtrosDispositivosActivos());
+  el('boton-actualizar-otros-historial').addEventListener('click', () => actualizarOtrosDispositivosHistorial());
 
   el('campo-cliente').addEventListener('change', (e) => poblarSelectDestinos(e.target.value));
   manejarSeleccionConOpcionNueva('campo-vehiculo', 'bloque-nuevo-vehiculo');

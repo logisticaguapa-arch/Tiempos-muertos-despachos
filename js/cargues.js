@@ -58,6 +58,7 @@ async function crearCargue({ clienteId, destinoId, vehiculoId, conductorId, fech
   }
   const ahora = new Date().toISOString();
   const id = await db.cargues.add({
+    idGlobal: generarIdGlobal(), // FASE N19 — ver db.js: único entre todos los celulares, no solo en este
     fecha,
     clienteId: Number(clienteId),
     destinoId: Number(destinoId),

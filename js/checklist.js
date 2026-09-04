@@ -30,6 +30,7 @@ async function asegurarChecklistCreado(cargueId) {
   await db.transaction('rw', [db.checklistRespuestas, db.cargues], async () => {
     for (const item of items) {
       await db.checklistRespuestas.add({
+        idGlobal: generarIdGlobal(), // FASE N19 — ver db.js
         cargueId,
         itemId: item.id,
         textoSnapshot: item.texto,

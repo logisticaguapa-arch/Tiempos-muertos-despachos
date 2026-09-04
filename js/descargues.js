@@ -62,6 +62,7 @@ async function crearDescargue({
 
   const ahora = new Date().toISOString();
   return db.descargues.add({
+    idGlobal: generarIdGlobal(), // FASE N19 — ver db.js
     fecha,
     remision: (remision || '').trim(),
     clienteId: Number(clienteId),

@@ -89,7 +89,12 @@ async function _obtenerCarguesConDetalle() {
 
 async function construirFilasCargues(carguesConDetalle) {
   return carguesConDetalle.map((c) => ({
-    id: c.id,
+    // FASE N19 — se sube el "idGlobal" (único entre TODOS los celulares, ver db.js), no el "id" local de
+    // Dexie: dos celulares distintos pueden tener, cada uno, su propio cargue con id local = 1 — si se
+    // subiera ese "id" tal cual, el upsert por "id" de Code.gs haría que el cargue de un celular pisara
+    // el del otro en la hoja. c.id queda de respaldo por si algún registro muy viejo no alcanzó a
+    // migrarse (ver migrarIdsGlobalesSiHaceFalta en db.js) — no debería pasar en uso normal.
+    id: c.idGlobal || c.id,
     fecha: c.fecha,
     cliente: c.clienteNombre,
     destino_ciudad: c.destinoCiudad,
@@ -118,8 +123,8 @@ async function construirFilasParadas(carguesConDetalle) {
   return paradas.map((p) => {
     const cargue = carguePorId[p.cargueId];
     return {
-      id: p.id,
-      cargue_id: p.cargueId,
+      id: p.idGlobal || p.id, // FASE N19 — ver nota en construirFilasCargues
+      cargue_id: cargue?.idGlobal || p.cargueId, // idGlobal del cargue — así se puede volver a unir aunque venga de otro celular
       fecha: cargue?.fecha || '',
       placa: cargue?.placa || '',
       categoria: p.categoriaNombreSnapshot,
@@ -143,8 +148,8 @@ async function construirFilasChecklist(carguesConDetalle) {
   return respuestas.map((r) => {
     const cargue = carguePorId[r.cargueId];
     return {
-      id: r.id,
-      cargue_id: r.cargueId,
+      id: r.idGlobal || r.id, // FASE N19 — ver nota en construirFilasCargues
+      cargue_id: cargue?.idGlobal || r.cargueId,
       fecha: cargue?.fecha || '',
       placa: cargue?.placa || '',
       orden: r.ordenSnapshot,
@@ -160,7 +165,7 @@ async function construirFilasDescargues() {
   const descargues = await listarDescarguesConDetalle(); // reutiliza el mismo cruce de descargues.js
 
   return descargues.map((d) => ({
-    id: d.id,
+    id: d.idGlobal || d.id, // FASE N19 — ver nota en construirFilasCargues
     fecha: d.fecha,
     remision: d.remision || '',
     cliente_origen: d.clienteNombre,
@@ -238,6 +243,56 @@ async function sincronizarConSheets() {
     cantidadChecklist: checklist.length,
     cantidadDescargues: descargues.length,
     sincronizadoEn: ahoraIso,
+  };
+}
+
+// ---- Lectura compartida (Fase N18/N19 — "en otros dispositivos") ----------------------------------------
+//
+// El mismo enlace configurado para SUBIR datos también sirve para TRAERLOS DE VUELTA: Code.gs responde
+// distinto según lleve o no "?leer=1" en la URL (ver Code.gs, doGet). Así cualquier dispositivo con el
+// enlace puede ver lo que TODOS los demás ya subieron, sin abrir la hoja de cálculo aparte y sin agregar
+// ningún servidor o cuenta nueva — usando exactamente las mismas tres piezas que ya existían (la hoja con
+// el código de Apps Script, este archivo index.html, y el enlace de GitHub).
+//
+// Esto NO es "en vivo al segundo": cada llamada trae la última foto que haya en la hoja en ese instante.
+// Ver js/consolidado.js (la mezcla con lo local) y las secciones "🌐 En otros dispositivos" en app.js.
+async function obtenerDatosCompartidos() {
+  const url = await obtenerUrlSheets();
+  if (!url) {
+    throw new Error('Todavía no configuras el enlace de Google Sheets. Usa "Configurar enlace" primero.');
+  }
+
+  const separador = url.includes('?') ? '&' : '?';
+  const urlLectura = `${url}${separador}leer=1`;
+
+  const control = new AbortController();
+  const timeoutId = setTimeout(() => control.abort(), 15000);
+
+  let respuestaCruda;
+  try {
+    respuestaCruda = await fetch(urlLectura, { method: 'GET', signal: control.signal });
+  } catch (error) {
+    throw new Error('No hay conexión a internet en este momento. Intenta de nuevo cuando haya señal.');
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  let respuesta;
+  try {
+    respuesta = await respuestaCruda.json();
+  } catch (error) {
+    throw new Error('El enlace configurado no respondió como se esperaba. Revisa que el código de Apps Script (Code.gs) esté en su versión más reciente.');
+  }
+
+  if (!respuesta.ok) {
+    throw new Error(respuesta.error || 'Google Sheets no pudo devolver los datos.');
+  }
+
+  return {
+    cargues: respuesta.cargues || [],
+    paradas: respuesta.paradas || [],
+    checklist: respuesta.checklist || [],
+    descargues: respuesta.descargues || [],
   };
 }
 
