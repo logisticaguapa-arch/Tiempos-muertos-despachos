@@ -1659,6 +1659,7 @@ async function iniciar() {
 
   await sembrarCatalogosSiHaceFalta();
   await migrarCatalogoCausasV2SiHaceFalta();
+  await desactivarCausaDescargueCanastasSiHaceFalta(); // FASE N21 — ver db.js
   await migrarIdsGlobalesSiHaceFalta(); // FASE N19 — ver db.js
 
   if (await haySesionActiva()) {

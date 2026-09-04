@@ -186,7 +186,10 @@ const CAUSAS_V2 = [
   { categoria: 'Canastas y empaque', nombre: 'Reempaque de bines', responsable: 'Despachos', tipoTiempo: 'ACTIVIDAD_OPERATIVA' },
   { categoria: 'Canastas y empaque', nombre: 'Reempaque de canastas IFCO', responsable: 'Despachos', tipoTiempo: 'ACTIVIDAD_OPERATIVA' },
   { categoria: 'Equipos de planta', nombre: 'Falta montacarga', responsable: 'Operaciones / Taller', tipoTiempo: 'ESPERA' },
-  { categoria: 'Canastas y empaque', nombre: 'Descargue de canastas', responsable: 'Despachos', tipoTiempo: 'ACTIVIDAD_OPERATIVA' },
+  // FASE N21 — "Descargue de canastas" YA NO es una causa de parada: se retira de aquí a propósito. Todo
+  // descargue de canastas se maneja por la opción principal "Descargue de canastas" (botón "+" → ver
+  // descargues.js), no como una pausa dentro de un cargue. En los celulares que YA tenían esta causa
+  // activa de antes, se desactiva sola (ver desactivarCausaDescargueCanastasSiHaceFalta más abajo).
   { categoria: 'Equipos de planta', nombre: 'Reparación de báscula', responsable: 'Mantenimiento / Taller', tipoTiempo: 'TIEMPO_MUERTO' },
   { categoria: 'Fruta', nombre: 'Búsqueda de fruta', responsable: 'Producción / Cosecha', tipoTiempo: 'ESPERA' },
   { categoria: 'Operación y calidad', nombre: 'Intervención de calidad', responsable: 'Postcosecha / Calidad', tipoTiempo: 'TIEMPO_MUERTO' },
@@ -240,6 +243,26 @@ async function migrarCatalogoCausasV2SiHaceFalta() {
       await db.config.put({ clave: 'causasReemplazadasV2', valor: true });
     },
   );
+}
+
+// FASE N21 — "Descargue de canastas" deja de ser una causa de parada (se retiró de CAUSAS_V2 más
+// arriba): a partir de ahora todo descargue de canastas se registra por la opción principal "Descargue
+// de canastas" (botón "+"), no como una pausa dentro de un cargue. Esto desactiva esa causa en los
+// celulares que YA la tenían activa de antes de este cambio — no la borra (las paradas ya registradas
+// con esa causa guardan su propia "foto" del nombre, ver causaNombreSnapshot en tiempos.js, así que el
+// historial no se altera). Corre UNA sola vez por celular (marcada con
+// config.causaDescargueCanastasDesactivada): si después de esto un supervisor decide reactivarla a mano
+// desde "Gestionar causas", esta migración no se la vuelve a desactivar.
+async function desactivarCausaDescargueCanastasSiHaceFalta() {
+  const yaSeAplico = await db.config.get('causaDescargueCanastasDesactivada');
+  if (yaSeAplico?.valor) return;
+
+  await db.transaction('rw', [db.causasParada, db.config], async () => {
+    await db.causasParada
+      .filter((c) => c.nombre === 'Descargue de canastas' && c.activo)
+      .modify({ activo: false });
+    await db.config.put({ clave: 'causaDescargueCanastasDesactivada', valor: true });
+  });
 }
 
 // Idempotente: solo siembra si la tabla de clientes está vacía (primera vez que se abre la app en ese

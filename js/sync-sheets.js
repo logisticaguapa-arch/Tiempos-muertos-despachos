@@ -34,9 +34,17 @@
 
 // ---- Configuración (guardada en db.config, la misma tabla clave/valor de Fase N1) ---------------------
 
+// FASE N20 — enlace de Google Sheets YA CONFIGURADO de fábrica (el de producción de Agrícola Guapa): así
+// CUALQUIER celular o computador que abra el link de la app sincroniza solo desde el primer momento, sin
+// que nadie tenga que copiar y pegar nada a mano en "⚙ Herramientas → Configurar enlace". Ese panel se
+// deja funcionando igual (ver guardarUrlSheets más abajo) por si algún día hace falta apuntar a otra
+// hoja distinta — lo que se guarde ahí, EN ESE CELULAR, tiene prioridad sobre este valor por defecto.
+const URL_SHEETS_POR_DEFECTO =
+  'https://script.google.com/macros/s/AKfycbx-Lb1ZdOFF23naiA5YXDlPCepvR62N5mEDo2OOY9Bd4egBQWIqtkJHbxE_mkj0S_T9/exec';
+
 async function obtenerUrlSheets() {
   const fila = await db.config.get('urlSheetsWebApp');
-  return fila?.valor || '';
+  return fila?.valor || URL_SHEETS_POR_DEFECTO;
 }
 
 async function guardarUrlSheets(url) {
