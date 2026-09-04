@@ -11,7 +11,7 @@
   nunca borra un cargue ni una parada ya guardados.
 */
 
-const CACHE_NOMBRE = 'piloto-guapa-v5';
+const CACHE_NOMBRE = 'piloto-guapa-v8';
 
 const ARCHIVOS_APP_SHELL = [
   './',
@@ -30,6 +30,7 @@ const ARCHIVOS_APP_SHELL = [
   './js/indicadores.js',
   './js/respaldo.js',
   './js/sync-sheets.js',
+  './js/consolidado.js',
   './js/app.js',
   './icons/icon-192.png',
   './icons/icon-512.png',

@@ -56,6 +56,17 @@
         <p class="nota-fase">Toca "Nuevo cargue" para crear el primero.</p>
       </div>
       <ul id="lista-cargues" class="lista-cargues"></ul>
+
+      <!-- FASE N19 — se carga sola (sin botón aparte) al abrir esta pantalla y se refresca cada minuto
+           mientras quede abierta: lo más cercano a "en línea" que se puede lograr solo con Google Sheets
+           como base compartida (ver docs/PROPUESTA_ARQUITECTURA_PILOTO_SIMPLE.md y js/consolidado.js). -->
+      <div class="fila-titulo-otros-dispositivos">
+        <h2 class="subtitulo-historial">🌐 En otros dispositivos</h2>
+        <button type="button" id="boton-actualizar-otros-activos" class="boton-enlace">Actualizar</button>
+      </div>
+      <p id="estado-otros-activos" class="nota-fase"></p>
+      <p id="mensaje-error-otros-activos" class="mensaje-error" hidden></p>
+      <ul id="lista-otros-activos" class="lista-cargues"></ul>
     </div>
 
     <button id="boton-nuevo-cargue" class="boton-flotante" title="Registrar nuevo">+</button>
@@ -95,6 +106,7 @@
         <p id="mensaje-sheets-ok" class="mensaje-ok" hidden></p>
 
         <h3 class="titulo-herramientas">Copia de seguridad</h3>
+        <p id="estado-almacenamiento" class="nota-fase"></p>
         <div class="acciones-respaldo">
           <button id="boton-respaldar-datos" class="boton-secundario">Respaldar datos</button>
           <button id="boton-restaurar-datos" class="boton-secundario">Restaurar datos</button>
@@ -323,6 +335,19 @@
         <p>Todavía no hay descargues de canastas registrados.</p>
       </div>
       <ul id="lista-descargues-historial" class="lista-cargues"></ul>
+
+      <!-- FASE N19 — igual que en "Cargues activos": se carga sola al abrir esta pantalla, sin botón
+           aparte, y se refresca cada minuto mientras quede abierta. -->
+      <div class="fila-titulo-otros-dispositivos">
+        <h2 class="subtitulo-historial">🌐 De otros dispositivos</h2>
+        <button type="button" id="boton-actualizar-otros-historial" class="boton-enlace">Actualizar</button>
+      </div>
+      <p id="estado-otros-historial" class="nota-fase"></p>
+      <p id="mensaje-error-otros-historial" class="mensaje-error" hidden></p>
+      <ul id="lista-otros-historial-cargues" class="lista-cargues"></ul>
+
+      <h3 class="subtitulo-historial">Descargues (otros dispositivos)</h3>
+      <ul id="lista-otros-historial-descargues" class="lista-cargues"></ul>
     </div>
   </section>
 
@@ -357,6 +382,7 @@
   <script src="./js/indicadores.js"></script>
   <script src="./js/respaldo.js"></script>
   <script src="./js/sync-sheets.js"></script>
+  <script src="./js/consolidado.js"></script>
   <script src="./js/app.js"></script>
 
   <!-- FASE N13 — registra el service worker (ver sw.js) SOLO cuando la app se abre por http(s), como
