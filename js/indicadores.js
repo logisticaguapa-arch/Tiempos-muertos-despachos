@@ -6,6 +6,15 @@
   números o nunca los tendrá. Se filtra por la fecha del cargue (el mismo campo `fecha` que ya se ve en
   la lista y en el historial), no por la hora exacta de inicio/fin, para que "Hoy" signifique lo mismo
   en toda la app.
+
+  FASE N23 — el Tablero operativo NO sumaba lo registrado en otros celulares (solo leía db.cargues local),
+  algo que el supervisor de cosecha señaló directamente. Las cinco funciones de este archivo ya NO
+  consultan Dexie por su cuenta: reciben como parámetro el arreglo YA COMBINADO (local + lo que llegó de
+  Google Sheets, ver combinarCarguesFinalizadosTablero/combinarParadasCerradasTablero/
+  combinarDescarguesTablero en consolidado.js) y calculan sobre ese arreglo único. Los comparativos por
+  vehículo/cliente además cambiaron de agrupar por id de catálogo local (vehiculoId/clienteId, que no
+  significa nada en un registro que vino de otro celular) a agrupar por TEXTO (placa/clienteNombre), que
+  es lo único que tiene el mismo significado en cualquier celular.
 */
 
 function rangoDeFiltroIndicadores(filtro) {
@@ -27,13 +36,12 @@ function rangoDeFiltroIndicadores(filtro) {
   return { desde: null, hasta: null }; // 'todo'
 }
 
-async function calcularIndicadores(filtro) {
+// `carguesFinalizadosCombinados`/`paradasCerradasCombinadas`: arreglos YA COMBINADOS (local + remoto, ver
+// combinarCarguesFinalizadosTablero/combinarParadasCerradasTablero en consolidado.js) — este cálculo ya
+// no distingue de qué celular vino cada uno, solo filtra por fecha dentro del arreglo recibido.
+async function calcularIndicadores(filtro, carguesFinalizadosCombinados, paradasCerradasCombinadas) {
   const { desde, hasta } = rangoDeFiltroIndicadores(filtro);
-  // Incluye también 'CERRADO' (estado terminal alcanzable desde FINALIZADO, ver estado.js) — hoy no hay
-  // ningún botón que lo dispare, pero si en el futuro lo hay, estos indicadores no deben "perder" esos
-  // cargues silenciosamente.
-  const finalizados = await db.cargues.where('estado').anyOf('FINALIZADO', 'CERRADO').toArray();
-  const enRango = finalizados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
+  const enRango = carguesFinalizadosCombinados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
 
   if (enRango.length === 0) {
     return { cantidadCargues: 0, promedioTiempoTotal: 0, promedioTiempoDetenido: 0, promedioPorcentajeProductivo: 0, ranking: [] };
@@ -53,9 +61,8 @@ async function calcularIndicadores(filtro) {
     : 0;
 
   // Ranking de causas por tiempo acumulado — se recorren las paradas cerradas de los cargues del rango.
-  const idsCargueEnRango = new Set(enRango.map((c) => c.id));
-  const todasLasParadas = await db.paradas.toArray();
-  const paradasEnRango = todasLasParadas.filter((p) => idsCargueEnRango.has(p.cargueId) && p.horaFin);
+  const idsCargueEnRango = new Set(enRango.map((c) => c.idGlobal));
+  const paradasEnRango = paradasCerradasCombinadas.filter((p) => idsCargueEnRango.has(p.cargueIdGlobal));
 
   const acumuladoPorCausa = {};
   for (const p of paradasEnRango) {
@@ -75,10 +82,9 @@ async function calcularIndicadores(filtro) {
 // canastillas descargadas por tipo. A diferencia de los cargues, un descargue no tiene estado
 // "finalizado" — se cuenta apenas se guarda (ver crearDescargue en descargues.js), por eso se filtra
 // solo por fecha, no por estado.
-async function calcularIndicadoresDescargue(filtro) {
+async function calcularIndicadoresDescargue(filtro, descarguesCombinados) {
   const { desde, hasta } = rangoDeFiltroIndicadores(filtro);
-  const todos = await db.descargues.toArray();
-  const enRango = todos.filter((d) => (!desde || d.fecha >= desde) && (!hasta || d.fecha <= hasta));
+  const enRango = descarguesCombinados.filter((d) => (!desde || d.fecha >= desde) && (!hasta || d.fecha <= hasta));
 
   const tiempoTotalSegundos = enRango.reduce((suma, d) => suma + (d.duracionSegundos || 0), 0);
   const canastillasEncajables = enRango.reduce((suma, d) => suma + (d.canastillasEncajables || 0), 0);
@@ -110,10 +116,9 @@ const MAX_DIAS_SERIE_TODO = 30;
 
 // Cargues finalizados por día, en el rango del filtro — con TODOS los días del rango presentes (incluso
 // en cero), para que la gráfica no salte fechas sin datos.
-async function calcularSerieDiariaCargues(filtro) {
+async function calcularSerieDiariaCargues(filtro, carguesFinalizadosCombinados) {
   const { desde, hasta } = rangoDeFiltroIndicadores(filtro);
-  const finalizados = await db.cargues.where('estado').anyOf('FINALIZADO', 'CERRADO').toArray();
-  let enRango = finalizados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
+  let enRango = carguesFinalizadosCombinados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
   if (enRango.length === 0) return [];
 
   let fechaDesde = desde;
@@ -148,25 +153,20 @@ async function calcularSerieDiariaCargues(filtro) {
 // Compara el desempeño entre vehículos dentro del periodo: cantidad de cargues y tiempo total/detenido
 // promedio. Se muestran como máximo los 8 vehículos con más cargues, para que la barra siga siendo
 // legible en pantallas pequeñas.
-async function calcularComparativoPorVehiculo(filtro) {
+//
+// FASE N23 — se agrupa por la PLACA (texto), no por `vehiculoId` (un id del catálogo local que no
+// significa nada en un cargue combinado que vino de otro celular): la placa es lo único que identifica
+// al mismo vehículo sin importar en qué celular se registró cada cargue.
+async function calcularComparativoPorVehiculo(filtro, carguesFinalizadosCombinados) {
   const { desde, hasta } = rangoDeFiltroIndicadores(filtro);
-  const finalizados = await db.cargues.where('estado').anyOf('FINALIZADO', 'CERRADO').toArray();
-  const enRango = finalizados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
+  const enRango = carguesFinalizadosCombinados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
   if (enRango.length === 0) return [];
-
-  const vehiculos = await db.vehiculos.toArray();
-  const vehiculoPorId = Object.fromEntries(vehiculos.map((v) => [v.id, v]));
 
   const acumulado = {};
   for (const c of enRango) {
-    const clave = c.vehiculoId;
+    const clave = c.placa || '(vehículo eliminado)';
     if (!acumulado[clave]) {
-      acumulado[clave] = {
-        placa: vehiculoPorId[clave]?.placa ?? '(vehículo eliminado)',
-        cantidad: 0,
-        tiempoTotal: 0,
-        tiempoDetenido: 0,
-      };
+      acumulado[clave] = { placa: clave, cantidad: 0, tiempoTotal: 0, tiempoDetenido: 0 };
     }
     acumulado[clave].cantidad += 1;
     acumulado[clave].tiempoTotal += c.tiempoTotalCargue || 0;
@@ -179,25 +179,18 @@ async function calcularComparativoPorVehiculo(filtro) {
     .slice(0, 8);
 }
 
-// Igual que el comparativo por vehículo, pero agrupado por cliente (EXITO/ARA/PDV).
-async function calcularComparativoPorCliente(filtro) {
+// Igual que el comparativo por vehículo, pero agrupado por cliente (EXITO/ARA/PDV) — también por TEXTO
+// (clienteNombre) en vez de `clienteId`, por la misma razón (Fase N23).
+async function calcularComparativoPorCliente(filtro, carguesFinalizadosCombinados) {
   const { desde, hasta } = rangoDeFiltroIndicadores(filtro);
-  const finalizados = await db.cargues.where('estado').anyOf('FINALIZADO', 'CERRADO').toArray();
-  const enRango = finalizados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
+  const enRango = carguesFinalizadosCombinados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
   if (enRango.length === 0) return [];
-
-  const clientes = await db.clientes.toArray();
-  const clientePorId = Object.fromEntries(clientes.map((c) => [c.id, c]));
 
   const acumulado = {};
   for (const c of enRango) {
-    const clave = c.clienteId;
+    const clave = c.clienteNombre || '(cliente eliminado)';
     if (!acumulado[clave]) {
-      acumulado[clave] = {
-        clienteNombre: clientePorId[clave]?.nombre ?? '(cliente eliminado)',
-        cantidad: 0,
-        tiempoTotal: 0,
-      };
+      acumulado[clave] = { clienteNombre: clave, cantidad: 0, tiempoTotal: 0 };
     }
     acumulado[clave].cantidad += 1;
     acumulado[clave].tiempoTotal += c.tiempoTotalCargue || 0;

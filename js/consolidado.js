@@ -1,26 +1,25 @@
 /*
-  FASE N19 — "EN OTROS DISPOSITIVOS": mezcla, directo en las pantallas normales (Cargues activos e
-  Historial), lo que TODOS los demás dispositivos ya subieron a Google Sheets — sin pantalla aparte, sin
-  botón especial que haya que ir a buscar. Es exactamente lo que se pidió: que cualquiera que abra el
-  enlace vea de una vez lo que los demás están registrando. Usa lo mismo que ya existía (la hoja de
-  cálculo con el código de Apps Script, este archivo index.html y el enlace de GitHub) — sin Firebase, sin
-  cuenta ni servidor nuevo (ver obtenerDatosCompartidos() en sync-sheets.js y Code.gs, doGet).
+  FASE N23 — REDISEÑO: UN SOLO SISTEMA, no "lo mío" vs "lo de otros dispositivos".
 
-  Por qué se hace una MEZCLA y no simplemente "mostrar todo tal cual llegó de Sheets": cada celular sigue
-  siendo dueño de SUS PROPIOS cargues y descargues — esos ya se ven, completos y EDITABLES, en la lista
-  local de siempre (Dexie/IndexedDB, ver db.js). Lo que faltaba era ver los de los DEMÁS dispositivos. Por
-  eso estas funciones toman lo que llegó de la hoja y le QUITAN lo que ya es de este dispositivo
-  (comparando por "idGlobal" — ver la migración en db.js), para no mostrar la misma tarjeta duplicada. Lo
-  que queda son cargues/descargues de OTROS dispositivos, y se muestran aparte, de SOLO LECTURA (no se
-  puede editar desde aquí lo que otro dispositivo registró — eso se sigue haciendo desde SU celular).
+  Hasta la Fase N19, esta pieza armaba una sección APARTE ("🌐 En otros dispositivos") con botón de
+  "Actualizar" manual. El supervisor de cosecha pidió explícitamente lo contrario: nada de botón (debe
+  ser automático), y nada de secciones separadas — un solo Cargues activos, un solo Historial, un solo
+  Tablero operativo, sin importar en qué celular se registró cada cosa.
 
-  Importante — qué tan "en línea" es esto en la práctica: no es instantáneo al segundo (Google Apps
-  Script no tiene forma de avisar cuando algo cambia en la hoja). Se trae de nuevo cada vez que se abre
-  "Cargues activos" o "Historial", al tocar "Actualizar", y cada minuto mientras cualquiera de esas dos
-  pantallas siga abierta (ver AUTO_REFRESCO_COMPARTIDO_MS en app.js). Sigue haciendo falta señal.
+  Este archivo ahora se dedica a NORMALIZAR y COMBINAR: convierte lo que llega de Google Sheets (texto
+  plano, minutos, ids globales) a la MISMA forma que ya usan las funciones locales (segundos, nombres ya
+  resueltos), y lo mezcla con lo local sin duplicar lo que este mismo celular ya subió — así el resto de
+  la app (app.js, indicadores.js) puede tratar todo como una sola fuente de datos, ordenada junta.
+
+  Sigue siendo de SOLO LECTURA del lado remoto: nada de lo que llega de otro celular se puede editar
+  desde aquí — lo que un supervisor registra se sigue guardando únicamente en su propio celular y solo se
+  ve reflejado en los demás cuando ese celular sincroniza.
 */
 
 const ETIQUETAS_ESTADO_TERMINAL_COMPARTIDO = ['Rechazado', 'Finalizado', 'Cerrado'];
+// Sin "Rechazado" — igual criterio que ESTADOS_TERMINALES-menos-rechazo en indicadores.js
+// (db.cargues.where('estado').anyOf('FINALIZADO', 'CERRADO')): un cargue rechazado no tiene tiempos.
+const ETIQUETAS_ESTADO_FINALIZADO_COMPARTIDO = ['Finalizado', 'Cerrado'];
 
 function esEstadoActivoCompartido(etiqueta) {
   return !ETIQUETAS_ESTADO_TERMINAL_COMPARTIDO.includes(etiqueta);
@@ -36,29 +35,220 @@ function claseEstadoConsolidado(etiqueta) {
   return '';
 }
 
-// Cargues ACTIVOS (no terminales) que llegaron de Sheets y NO son de este dispositivo — para "Cargues
-// activos". Más reciente primero.
-function carguesActivosDeOtrosDispositivos(datosCompartidos, idsGlobalesCarguesLocales) {
-  return (datosCompartidos.cargues || [])
-    .filter((c) => esEstadoActivoCompartido(c.estado))
-    .filter((c) => !idsGlobalesCarguesLocales.has(c.id))
-    .sort((a, b) => String(b.actualizado_en || b.fecha || '').localeCompare(String(a.actualizado_en || a.fecha || '')));
+// ---------------------------------------------------------------------------------------------------
+// NORMALIZACIÓN PARA LISTAS (Cargues activos / Historial) — un mismo objeto "de vitrina" para pintar una
+// tarjeta, venga de donde venga. El origen ('local'/'remoto') es un detalle INTERNO para saber cómo
+// enrutar el click (a la pantalla de detalle editable, o a la de solo lectura) — nunca se muestra en
+// pantalla, tal como pidió el supervisor ("un solo historial, no sectorizada").
+// ---------------------------------------------------------------------------------------------------
+
+function normalizarCargueListaLocal(c) {
+  return {
+    origen: 'local',
+    idLocal: c.id,
+    idGlobal: c.idGlobal || null,
+    placa: c.placa,
+    clienteNombre: c.clienteNombre,
+    destinoCiudad: c.destinoCiudad,
+    fecha: c.fecha,
+    estadoTexto: ETIQUETA_ESTADO[c.estado] || c.estado,
+    claseEstado: claseEstado(c.estado),
+    ordenClave: c.actualizadoEn || c.creadoEn || '',
+  };
 }
 
-// Cargues TERMINALES (Finalizado/Rechazado/Cerrado) que llegaron de Sheets y no son de este dispositivo —
-// para "Historial". Limitado a los 30 más recientes, igual criterio que el resto de listas de historial.
-function carguesHistorialDeOtrosDispositivos(datosCompartidos, idsGlobalesCarguesLocales) {
-  return (datosCompartidos.cargues || [])
-    .filter((c) => !esEstadoActivoCompartido(c.estado))
-    .filter((c) => !idsGlobalesCarguesLocales.has(c.id))
-    .sort((a, b) => String(b.actualizado_en || b.fecha || '').localeCompare(String(a.actualizado_en || a.fecha || '')))
-    .slice(0, 30);
+function normalizarCargueListaRemoto(c) {
+  return {
+    origen: 'remoto',
+    idLocal: null,
+    idGlobal: c.id,
+    placa: c.placa || '(vehículo eliminado)',
+    clienteNombre: c.cliente || '(cliente eliminado)',
+    destinoCiudad: c.destino_ciudad || '—',
+    fecha: c.fecha || '',
+    estadoTexto: c.estado || '—',
+    claseEstado: claseEstadoConsolidado(c.estado),
+    // "YYYY-MM-DD HH:MM" (formatearFechaHoraLocal en sync-sheets.js) -> "YYYY-MM-DDTHH:MM", comparable
+    // como texto con el ISO que usan los registros locales (actualizadoEn/creadoEn).
+    ordenClave: (c.actualizado_en || c.fecha || '').replace(' ', 'T'),
+  };
 }
 
-// Descargues que llegaron de Sheets y no son de este dispositivo — para "Historial".
-function descarguesDeOtrosDispositivos(datosCompartidos, idsGlobalesDescarguesLocales) {
-  return (datosCompartidos.descargues || [])
-    .filter((d) => !idsGlobalesDescarguesLocales.has(d.id))
-    .sort((a, b) => String(b.hora_fin || b.fecha || '').localeCompare(String(a.hora_fin || a.fecha || '')))
-    .slice(0, 30);
+function normalizarDescargueListaLocal(d) {
+  return {
+    origen: 'local',
+    idLocal: d.id,
+    idGlobal: d.idGlobal || null,
+    placa: d.placa,
+    clienteNombre: d.clienteNombre,
+    destinoCiudad: d.destinoCiudad,
+    conductorNombre: d.conductorNombre,
+    fecha: d.fecha,
+    remision: d.remision || '',
+    duracionSegundos: d.duracionSegundos || 0,
+    canastillasEncajables: d.canastillasEncajables || 0,
+    canastillasGrandes: d.canastillasGrandes || 0,
+    canastillasPequenas: d.canastillasPequenas || 0,
+    ordenClave: d.horaInicio || d.creadoEn || '',
+  };
+}
+
+function normalizarDescargueListaRemoto(d) {
+  return {
+    origen: 'remoto',
+    idLocal: null,
+    idGlobal: d.id,
+    placa: d.placa || '(vehículo eliminado)',
+    clienteNombre: d.cliente_origen || '(cliente eliminado)',
+    destinoCiudad: d.destino_origen || '—',
+    conductorNombre: d.conductor || '—',
+    fecha: d.fecha || '',
+    remision: d.remision || '',
+    duracionSegundos: Math.round((Number(d.duracion_min) || 0) * 60),
+    canastillasEncajables: Number(d.canastillas_encajables) || 0,
+    canastillasGrandes: Number(d.canastillas_grandes) || 0,
+    canastillasPequenas: Number(d.canastillas_pequenas) || 0,
+    ordenClave: (d.hora_inicio || d.fecha || '').replace(' ', 'T'),
+  };
+}
+
+// COMBINACIÓN — une lo local con lo remoto SIN DUPLICAR: si este mismo celular ya subió un cargue, ese
+// mismo cargue vuelve a llegar en la lectura de Sheets (con el mismo idGlobal) — se descarta la copia
+// remota y se deja la local (es la editable / la más al día en este celular). El resultado es UN SOLO
+// arreglo, ordenado por más reciente, listo para pintarse como una sola lista, sin secciones.
+function combinarListaCargues(localesConDetalle, carguesRemotos, filtroEstadoRemoto) {
+  const idsGlobalesLocales = new Set(localesConDetalle.map((c) => c.idGlobal).filter(Boolean));
+  const locales = localesConDetalle.map(normalizarCargueListaLocal);
+  const remotos = (carguesRemotos || [])
+    .filter((c) => filtroEstadoRemoto(c.estado))
+    .filter((c) => !idsGlobalesLocales.has(c.id))
+    .map(normalizarCargueListaRemoto);
+  return [...locales, ...remotos].sort((a, b) => String(b.ordenClave).localeCompare(String(a.ordenClave)));
+}
+
+function combinarListaDescargues(localesConDetalle, descarguesRemotos) {
+  const idsGlobalesLocales = new Set(localesConDetalle.map((d) => d.idGlobal).filter(Boolean));
+  const locales = localesConDetalle.map(normalizarDescargueListaLocal);
+  const remotos = (descarguesRemotos || [])
+    .filter((d) => !idsGlobalesLocales.has(d.id))
+    .map(normalizarDescargueListaRemoto);
+  return [...locales, ...remotos].sort((a, b) => String(b.ordenClave).localeCompare(String(a.ordenClave)));
+}
+
+// ---------------------------------------------------------------------------------------------------
+// PARA EL TABLERO OPERATIVO (indicadores.js) — mismo espíritu, pero con la forma de datos que necesitan
+// los cálculos de KPIs: cargues FINALIZADOS/CERRADOS (nunca Rechazados, igual que antes) y paradas
+// cerradas, agrupables por TEXTO (placa/cliente/causa) en vez de por id local — un id de catálogo local
+// (vehiculoId, clienteId) no significa nada en un registro que vino de OTRO celular.
+// ---------------------------------------------------------------------------------------------------
+
+function normalizarCargueTableroLocal(c) {
+  return {
+    idGlobal: c.idGlobal || `local-${c.id}`,
+    fecha: c.fecha,
+    placa: c.placa,
+    clienteNombre: c.clienteNombre,
+    tiempoTotalCargue: c.tiempoTotalCargue || 0,
+    tiempoDetenidoTotal: c.tiempoDetenidoTotal || 0,
+    tiempoProductivoCargue: c.tiempoProductivoCargue || 0,
+    cantidadParadas: c.cantidadParadas || 0,
+  };
+}
+
+function normalizarCargueTableroRemoto(c) {
+  return {
+    idGlobal: c.id,
+    fecha: c.fecha || '',
+    placa: c.placa || '(vehículo eliminado)',
+    clienteNombre: c.cliente || '(cliente eliminado)',
+    tiempoTotalCargue: Math.round((Number(c.tiempo_total_min) || 0) * 60),
+    tiempoDetenidoTotal: Math.round((Number(c.tiempo_detenido_min) || 0) * 60),
+    tiempoProductivoCargue: Math.round((Number(c.tiempo_productivo_min) || 0) * 60),
+    cantidadParadas: Number(c.cantidad_paradas) || 0,
+  };
+}
+
+function combinarCarguesFinalizadosTablero(finalizadosLocalesConDetalle, carguesRemotos) {
+  const idsGlobalesLocales = new Set(finalizadosLocalesConDetalle.map((c) => c.idGlobal).filter(Boolean));
+  const locales = finalizadosLocalesConDetalle.map(normalizarCargueTableroLocal);
+  const remotos = (carguesRemotos || [])
+    .filter((c) => ETIQUETAS_ESTADO_FINALIZADO_COMPARTIDO.includes(c.estado))
+    .filter((c) => !idsGlobalesLocales.has(c.id))
+    .map(normalizarCargueTableroRemoto);
+  return [...locales, ...remotos];
+}
+
+// `paradasLocalesTodas`/`carguesLocalesTodos`: TODOS los registros locales (sin filtrar por rango de
+// fecha — el filtro por rango lo sigue haciendo indicadores.js sobre el arreglo de cargues combinados).
+function combinarParadasCerradasTablero(paradasLocalesTodas, carguesLocalesTodos, paradasRemotas) {
+  const idGlobalPorCargueLocalId = Object.fromEntries(carguesLocalesTodos.map((c) => [c.id, c.idGlobal]));
+  const idsGlobalesLocales = new Set(paradasLocalesTodas.map((p) => p.idGlobal).filter(Boolean));
+
+  const locales = paradasLocalesTodas
+    .filter((p) => p.horaFin)
+    .map((p) => ({
+      cargueIdGlobal: idGlobalPorCargueLocalId[p.cargueId] || `local-${p.cargueId}`,
+      causaNombreSnapshot: p.causaNombreSnapshot,
+      duracionSegundos: p.duracionSegundos || 0,
+    }));
+
+  const remotas = (paradasRemotas || [])
+    .filter((p) => p.hora_fin && !idsGlobalesLocales.has(p.id))
+    .map((p) => ({
+      cargueIdGlobal: p.cargue_id,
+      causaNombreSnapshot: p.causa || 'Sin causa',
+      duracionSegundos: Math.round((Number(p.duracion_min) || 0) * 60),
+    }));
+
+  return [...locales, ...remotas];
+}
+
+function normalizarDescargueTableroLocal(d) {
+  return {
+    idGlobal: d.idGlobal || `local-${d.id}`,
+    fecha: d.fecha,
+    duracionSegundos: d.duracionSegundos || 0,
+    canastillasEncajables: d.canastillasEncajables || 0,
+    canastillasGrandes: d.canastillasGrandes || 0,
+    canastillasPequenas: d.canastillasPequenas || 0,
+  };
+}
+
+function normalizarDescargueTableroRemoto(d) {
+  return {
+    idGlobal: d.id,
+    fecha: d.fecha || '',
+    duracionSegundos: Math.round((Number(d.duracion_min) || 0) * 60),
+    canastillasEncajables: Number(d.canastillas_encajables) || 0,
+    canastillasGrandes: Number(d.canastillas_grandes) || 0,
+    canastillasPequenas: Number(d.canastillas_pequenas) || 0,
+  };
+}
+
+function combinarDescarguesTablero(descarguesLocalesConDetalle, descarguesRemotos) {
+  const idsGlobalesLocales = new Set(descarguesLocalesConDetalle.map((d) => d.idGlobal).filter(Boolean));
+  const locales = descarguesLocalesConDetalle.map(normalizarDescargueTableroLocal);
+  const remotos = (descarguesRemotos || [])
+    .filter((d) => !idsGlobalesLocales.has(d.id))
+    .map(normalizarDescargueTableroRemoto);
+  return [...locales, ...remotos];
+}
+
+// ---------------------------------------------------------------------------------------------------
+// PUNTO ÚNICO DE ENTRADA — trae lo compartido UNA vez desde Google Sheets. Si no responde (sin señal, o
+// el enlace todavía no está configurado), se resuelve con arreglos vacíos y un texto de error — NUNCA
+// lanza el error hacia arriba, para que la pantalla local siga funcionando igual de bien sin internet, y
+// para que nunca haga falta un botón de "Actualizar": cada pantalla llama esto sola al abrirse y cada
+// minuto mientras siga abierta (ver app.js).
+// ---------------------------------------------------------------------------------------------------
+async function obtenerDatosCompartidosSeguro() {
+  try {
+    const datos = await obtenerDatosCompartidos();
+    return { datos, error: null };
+  } catch (error) {
+    return {
+      datos: { cargues: [], paradas: [], checklist: [], descargues: [] },
+      error: error.message || 'No se pudo traer lo de los demás celulares.',
+    };
+  }
 }

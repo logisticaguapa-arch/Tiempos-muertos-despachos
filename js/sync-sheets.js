@@ -160,6 +160,10 @@ async function construirFilasChecklist(carguesConDetalle) {
       cargue_id: cargue?.idGlobal || r.cargueId,
       fecha: cargue?.fecha || '',
       placa: cargue?.placa || '',
+      // FASE N23 — antes solo traía fecha/placa (Fase N16): sin el cliente, revisando la hoja no
+      // quedaba claro a qué cliente pertenecía cada ítem del checklist.
+      cliente: cargue?.clienteNombre || '',
+      destino_ciudad: cargue?.destinoCiudad || '',
       orden: r.ordenSnapshot,
       item: r.textoSnapshot,
       critico: r.criticoSnapshot ? 'Sí' : 'No',

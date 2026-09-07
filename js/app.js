@@ -125,14 +125,16 @@ async function mostrarEstadoSheets() {
   nota.textContent = 'Enlace configurado. Se sincroniza solo con cada acción guardada.';
 }
 
-const PANTALLAS_CON_OTROS_DISPOSITIVOS = ['pantalla-principal', 'pantalla-historial'];
+// FASE N23 — ahora también incluye "pantalla-indicadores" (el Tablero operativo no se refrescaba solo
+// antes, así que si un supervisor lo dejaba abierto no veía llegar cargues nuevos de otros celulares).
+const PANTALLAS_CON_AUTOREFRESCO_COMPARTIDO = ['pantalla-principal', 'pantalla-historial', 'pantalla-indicadores'];
 
 function mostrarPantalla(idPantalla) {
-  // FASE N19 — "Cargues activos" e "Historial" se refrescan solas con lo de otros dispositivos mientras
-  // quedan abiertas (ver iniciarAutoRefrescoCompartidoSiHaceFalta más abajo); al navegar a CUALQUIER otra
-  // pantalla ese refresco automático debe apagarse, si no seguiría llamando a Google Sheets de fondo
-  // aunque el supervisor ya ni esté viendo esas pantallas.
-  if (PANTALLAS_CON_OTROS_DISPOSITIVOS.includes(idPantalla)) {
+  // FASE N19 — "Cargues activos", "Historial" y "Tablero operativo" se refrescan solos con lo de los
+  // demás celulares mientras quedan abiertos (ver iniciarAutoRefrescoCompartidoSiHaceFalta más abajo); al
+  // navegar a CUALQUIER otra pantalla ese refresco automático debe apagarse, si no seguiría llamando a
+  // Google Sheets de fondo aunque el supervisor ya ni esté viendo esas pantallas.
+  if (PANTALLAS_CON_AUTOREFRESCO_COMPARTIDO.includes(idPantalla)) {
     iniciarAutoRefrescoCompartidoSiHaceFalta();
   } else {
     detenerAutoRefrescoCompartido();
@@ -181,114 +183,141 @@ function claseEstado(estado) {
   return '';
 }
 
+// Pinta una <li> de tarjeta de cargue a partir del objeto YA NORMALIZADO (ver normalizarCargueListaLocal/
+// normalizarCargueListaRemoto en consolidado.js) — la MISMA tarjeta para local o remoto, sin ninguna
+// marca de "otro dispositivo": el supervisor pidió un solo historial, no sectorizado (Fase N23). Lo
+// único que cambia según el origen es a dónde lleva el click (ver wireTarjetasCargueUnificadas).
+function renderizarFilaCargueUnificada(c) {
+  const dataId = c.origen === 'local' ? `data-cargue-id="${c.idLocal}"` : `data-cargue-idglobal="${c.idGlobal}"`;
+  return `
+    <li>
+      <button class="tarjeta-cargue" data-origen="${c.origen}" ${dataId}>
+        <div class="fila-superior">
+          <span class="placa">${c.placa}</span>
+          <span class="etiqueta-estado ${c.claseEstado}">${c.estadoTexto}</span>
+        </div>
+        <div class="cliente-destino">${c.clienteNombre} — ${c.destinoCiudad}${c.fecha ? ' · ' + c.fecha : ''}</div>
+      </button>
+    </li>`;
+}
+
+// Enruta el click según el origen de la tarjeta: local -> detalle completo y editable (de siempre);
+// remoto -> detalle de SOLO LECTURA (ver abrirDetalleCargueRemoto) — un cargue de otro celular se puede
+// consultar completo (placa, cliente, fecha, checklist, paradas) pero no editar desde aquí.
+function wireTarjetasCargueUnificadas(lista, origenPantalla) {
+  lista.querySelectorAll('.tarjeta-cargue').forEach((boton) => {
+    boton.addEventListener('click', () => {
+      if (boton.dataset.origen === 'local') {
+        abrirDetalleCargue(Number(boton.dataset.cargueId), origenPantalla);
+      } else {
+        abrirDetalleCargueRemoto(boton.dataset.cargueIdglobal, origenPantalla);
+      }
+    });
+  });
+}
+
+// Pinta la pantalla principal ("Cargues activos") en DOS pasadas, sin bloquear ni mostrar nada de carga:
+// 1) de una vez, con lo que ya hay guardado en este celular (rápido, funciona sin señal);
+// 2) en cuanto llega lo de Google Sheets, se vuelve a pintar la MISMA lista ya mezclada con lo activo de
+//    los demás celulares — una sola lista, sin sección aparte y sin botón de "Actualizar" (Fase N23: el
+//    supervisor pidió que esto sea automático de verdad, sin nada que tocar).
 async function renderizarListaCargues() {
-  const activos = await listarCarguesActivosConDetalle();
   const lista = el('lista-cargues');
   const avisoVacio = el('lista-cargues-vacio');
 
-  if (activos.length === 0) {
+  const activosLocales = await listarCarguesActivosConDetalle();
+  _pintarListaUnificadaCargues(lista, avisoVacio, activosLocales.map(normalizarCargueListaLocal), 'principal');
+
+  const { datos, error } = await obtenerDatosCompartidosSeguro();
+  if (error) return; // sin señal o enlace no configurado — se queda con lo local, sin interrumpir a nadie
+  const combinada = combinarListaCargues(activosLocales, datos.cargues, esEstadoActivoCompartido);
+  _pintarListaUnificadaCargues(lista, avisoVacio, combinada, 'principal');
+}
+
+function _pintarListaUnificadaCargues(lista, avisoVacio, items, origenPantalla) {
+  if (items.length === 0) {
     lista.innerHTML = '';
     avisoVacio.removeAttribute('hidden');
     return;
   }
   avisoVacio.setAttribute('hidden', '');
-
-  lista.innerHTML = activos
-    .map(
-      (c) => `
-    <li>
-      <button class="tarjeta-cargue" data-cargue-id="${c.id}">
-        <div class="fila-superior">
-          <span class="placa">${c.placa}</span>
-          <span class="etiqueta-estado ${claseEstado(c.estado)}">${ETIQUETA_ESTADO[c.estado] || c.estado}</span>
-        </div>
-        <div class="cliente-destino">${c.clienteNombre} — ${c.destinoCiudad}</div>
-      </button>
-    </li>`,
-    )
-    .join('');
-
-  lista.querySelectorAll('.tarjeta-cargue').forEach((boton) => {
-    boton.addEventListener('click', () => abrirDetalleCargue(Number(boton.dataset.cargueId), 'principal'));
-  });
+  lista.innerHTML = items.map(renderizarFilaCargueUnificada).join('');
+  wireTarjetasCargueUnificadas(lista, origenPantalla);
 }
 
 async function iniciarPantallaPrincipal() {
   mostrarPantalla('pantalla-principal');
   await renderizarListaCargues();
   dispararSincronizacionSheets(); // intento silencioso al abrir/volver a la pantalla principal (Fase N11)
-  actualizarOtrosDispositivosActivos(); // FASE N19 — no se espera, no debe demorar la lista local
 }
 
 // ---------------------------------------------------------------------------------------------------
 // PANTALLA: HISTORIAL (Fase N5) — cargues Finalizados, Rechazados o Cerrados.
 // ---------------------------------------------------------------------------------------------------
 
+// Igual patrón de dos pasadas que renderizarListaCargues: primero lo local (rápido, sin red), y en
+// cuanto llega lo de Sheets se repinta la MISMA lista ya mezclada con el historial de los demás
+// celulares — un solo Historial, sin sección aparte ni botón de "Actualizar" (Fase N23).
 async function renderizarListaHistorial() {
-  const finalizados = await listarCarguesFinalizadosConDetalle();
   const lista = el('lista-historial');
   const avisoVacio = el('historial-vacio');
 
-  if (finalizados.length === 0) {
-    lista.innerHTML = '';
-    avisoVacio.removeAttribute('hidden');
-    return;
-  }
-  avisoVacio.setAttribute('hidden', '');
+  const finalizadosLocales = await listarCarguesFinalizadosConDetalle();
+  _pintarListaUnificadaCargues(lista, avisoVacio, finalizadosLocales.map(normalizarCargueListaLocal), 'historial');
 
-  lista.innerHTML = finalizados
-    .map(
-      (c) => `
-    <li>
-      <button class="tarjeta-cargue" data-cargue-id="${c.id}">
-        <div class="fila-superior">
-          <span class="placa">${c.placa}</span>
-          <span class="etiqueta-estado ${claseEstado(c.estado)}">${ETIQUETA_ESTADO[c.estado] || c.estado}</span>
-        </div>
-        <div class="cliente-destino">${c.clienteNombre} — ${c.destinoCiudad} · ${c.fecha}</div>
-      </button>
-    </li>`,
-    )
-    .join('');
-
-  lista.querySelectorAll('.tarjeta-cargue').forEach((boton) => {
-    boton.addEventListener('click', () => abrirDetalleCargue(Number(boton.dataset.cargueId), 'historial'));
-  });
+  const { datos, error } = await obtenerDatosCompartidosSeguro();
+  if (error) return;
+  const combinada = combinarListaCargues(finalizadosLocales, datos.cargues, (estado) => !esEstadoActivoCompartido(estado));
+  _pintarListaUnificadaCargues(lista, avisoVacio, combinada, 'historial');
 }
 
 // FASE N11/N12 — lista de los descargues de canastas, con opción de editar cualquiera de ellos (los
-// errores casi siempre se notan después de guardar, igual que con las paradas de un cargue).
+// errores casi siempre se notan después de guardar, igual que con las paradas de un cargue). FASE N23 —
+// un descargue de OTRO celular se ve con la misma tarjeta pero SIN el botón "Editar" (es de solo
+// lectura: lo registrado en otro celular solo se corrige desde ese mismo celular).
 function renderizarFilaDescargueHistorial(d) {
+  const dataId = d.origen === 'local' ? `data-descargue-id="${d.idLocal}"` : '';
   return `
     <li>
-      <div class="tarjeta-cargue" data-descargue-id="${d.id}">
+      <div class="tarjeta-cargue" data-origen="${d.origen}" ${dataId}>
         <div class="fila-superior">
           <span class="placa">${d.placa}</span>
           <span class="etiqueta-estado">${formatearDuracion(d.duracionSegundos)}</span>
         </div>
         <div class="cliente-destino">${d.clienteNombre} — ${d.destinoCiudad} · ${d.conductorNombre} · ${d.fecha}${d.remision ? ' · Rem. ' + d.remision : ''}</div>
         <div class="cliente-destino">Encajables: ${d.canastillasEncajables || 0} · Grandes: ${d.canastillasGrandes || 0} · Pequeñas: ${d.canastillasPequenas || 0}</div>
-        <div class="acciones-fila-parada">
-          <button type="button" class="boton-enlace boton-editar-descargue" data-descargue-id="${d.id}">Editar</button>
-        </div>
+        ${
+          d.origen === 'local'
+            ? `<div class="acciones-fila-parada">
+                <button type="button" class="boton-enlace boton-editar-descargue" data-descargue-id="${d.idLocal}">Editar</button>
+              </div>`
+            : ''
+        }
       </div>
     </li>`;
 }
 
 async function renderizarListaDescarguesHistorial() {
-  const descargues = await listarDescarguesConDetalle();
   const lista = el('lista-descargues-historial');
   const avisoVacio = el('descargues-vacio');
 
-  if (descargues.length === 0) {
+  const descarguesLocales = await listarDescarguesConDetalle();
+  _pintarListaDescargues(lista, avisoVacio, descarguesLocales.map(normalizarDescargueListaLocal));
+
+  const { datos, error } = await obtenerDatosCompartidosSeguro();
+  if (error) return;
+  const combinada = combinarListaDescargues(descarguesLocales, datos.descargues);
+  _pintarListaDescargues(lista, avisoVacio, combinada);
+}
+
+function _pintarListaDescargues(lista, avisoVacio, items) {
+  if (items.length === 0) {
     lista.innerHTML = '';
     avisoVacio.removeAttribute('hidden');
     return;
   }
   avisoVacio.setAttribute('hidden', '');
-
-  lista.innerHTML = descargues.map(renderizarFilaDescargueHistorial).join('');
-
+  lista.innerHTML = items.map(renderizarFilaDescargueHistorial).join('');
   lista.querySelectorAll('.boton-editar-descargue').forEach((boton) => {
     boton.addEventListener('click', () => mostrarFormularioEdicionDescargue(Number(boton.dataset.descargueId)));
   });
@@ -397,7 +426,6 @@ async function abrirPantallaHistorial() {
   mostrarPantalla('pantalla-historial');
   await renderizarListaHistorial();
   await renderizarListaDescarguesHistorial();
-  actualizarOtrosDispositivosHistorial(); // FASE N19 — no se espera, no debe demorar las listas locales
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -507,13 +535,37 @@ function renderizarBloqueComparativoClientes(lista) {
 
 const ETIQUETA_PERIODO_TABLERO = { hoy: 'Hoy', '7dias': 'Últimos 7 días', mes: 'Este mes', todo: 'Todo el histórico' };
 
+// FASE N23 — el Tablero operativo ahora SUMA lo registrado en los demás celulares, no solo lo local (el
+// supervisor de cosecha lo señaló directamente: "no la muestra en el tablero operativo"). Se trae lo
+// local primero (los mismos catálogos ya resueltos de siempre) y, si Sheets responde, se combina — ver
+// combinarCarguesFinalizadosTablero/combinarParadasCerradasTablero/combinarDescarguesTablero en
+// consolidado.js. Si no hay señal, el tablero simplemente se calcula con lo local, como siempre.
+async function _obtenerDatosTableroCombinados() {
+  const [finalizadosLocales, paradasLocalesTodas, carguesLocalesTodos, descarguesLocales] = await Promise.all([
+    listarCarguesFinalizadosConDetalle(),
+    db.paradas.toArray(),
+    db.cargues.toArray(),
+    listarDescarguesConDetalle(),
+  ]);
+
+  const { datos } = await obtenerDatosCompartidosSeguro(); // ya viene con arreglos vacíos si falla — nunca lanza
+
+  return {
+    carguesFinalizadosCombinados: combinarCarguesFinalizadosTablero(finalizadosLocales, datos.cargues),
+    paradasCerradasCombinadas: combinarParadasCerradasTablero(paradasLocalesTodas, carguesLocalesTodos, datos.paradas),
+    descarguesCombinados: combinarDescarguesTablero(descarguesLocales, datos.descargues),
+  };
+}
+
 async function renderizarIndicadores(filtro) {
+  const { carguesFinalizadosCombinados, paradasCerradasCombinadas, descarguesCombinados } = await _obtenerDatosTableroCombinados();
+
   const [datos, datosDescargue, serieDiaria, porVehiculo, porCliente] = await Promise.all([
-    calcularIndicadores(filtro),
-    calcularIndicadoresDescargue(filtro),
-    calcularSerieDiariaCargues(filtro),
-    calcularComparativoPorVehiculo(filtro),
-    calcularComparativoPorCliente(filtro),
+    calcularIndicadores(filtro, carguesFinalizadosCombinados, paradasCerradasCombinadas),
+    calcularIndicadoresDescargue(filtro, descarguesCombinados),
+    calcularSerieDiariaCargues(filtro, carguesFinalizadosCombinados),
+    calcularComparativoPorVehiculo(filtro, carguesFinalizadosCombinados),
+    calcularComparativoPorCliente(filtro, carguesFinalizadosCombinados),
   ]);
   const contenedor = el('contenido-indicadores');
 
@@ -584,105 +636,15 @@ function generarPdfTablero() {
 }
 
 // ---------------------------------------------------------------------------------------------------
-// "EN OTROS DISPOSITIVOS" (Fase N19) — mezclado directo en Cargues activos e Historial, ver
-// js/consolidado.js y obtenerDatosCompartidos() en sync-sheets.js. Es de SOLO LECTURA: aquí no se crea
-// ni edita nada — lo que un supervisor registra se sigue guardando únicamente en su propio celular.
+// FASE N23 — REFRESCO AUTOMÁTICO Y SILENCIOSO de lo compartido: sin botón, sin sección aparte. Cada
+// pantalla (Cargues activos, Historial, Tablero operativo) ya se mezcla sola al abrirse (ver
+// renderizarListaCargues/renderizarListaHistorial/renderizarListaDescarguesHistorial/renderizarIndicadores
+// más arriba/abajo); este intervalo es lo que hace que, si el supervisor DEJA una de esas pantallas
+// abierta, también se vaya poniendo al día sola cada minuto, sin que nadie tenga que tocar nada.
 // ---------------------------------------------------------------------------------------------------
 
 let _intervaloAutoRefrescoCompartido = null;
 const AUTO_REFRESCO_COMPARTIDO_MS = 60000; // 1 minuto — se acerca a "en línea" sin exagerar las llamadas al enlace de Apps Script
-
-async function _idsGlobalesLocales(tabla) {
-  const registros = await tabla.toArray();
-  return new Set(registros.map((r) => r.idGlobal).filter(Boolean));
-}
-
-function renderizarFilaCargueCompartido(c) {
-  const activo = esEstadoActivoCompartido(c.estado);
-  return `
-    <li>
-      <div class="tarjeta-cargue">
-        <div class="fila-superior">
-          <span class="placa">${c.placa || '—'}</span>
-          <span class="etiqueta-estado ${claseEstadoConsolidado(c.estado)}">${c.estado || '—'}</span>
-        </div>
-        <div class="cliente-destino">${c.cliente || ''} — ${c.destino_ciudad || ''} · ${c.fecha || ''}</div>
-        ${
-          !activo
-            ? `<div class="cliente-destino">Tiempo total: ${formatearDuracion((Number(c.tiempo_total_min) || 0) * 60)} · Detenido: ${formatearDuracion((Number(c.tiempo_detenido_min) || 0) * 60)}</div>`
-            : ''
-        }
-      </div>
-    </li>`;
-}
-
-function renderizarFilaDescargueCompartido(d) {
-  return `
-    <li>
-      <div class="tarjeta-cargue">
-        <div class="fila-superior">
-          <span class="placa">${d.placa || '—'}</span>
-          <span class="etiqueta-estado">${formatearDuracion((Number(d.duracion_min) || 0) * 60)}</span>
-        </div>
-        <div class="cliente-destino">${d.cliente_origen || ''} — ${d.destino_origen || ''} · ${d.fecha || ''}${d.remision ? ' · Rem. ' + d.remision : ''}</div>
-      </div>
-    </li>`;
-}
-
-// Trae de Sheets y muestra en "Cargues activos" lo que registraron OTROS dispositivos. Nunca interrumpe
-// ni bloquea la pantalla local: si falla (sin señal, enlace todavía no configurado), se calla con un
-// aviso discreto — la lista local (la propia, editable) sigue funcionando exactamente igual, y el
-// próximo refresco automático (o tocar "Actualizar") lo vuelve a intentar solo.
-async function actualizarOtrosDispositivosActivos() {
-  const estado = el('estado-otros-activos');
-  const mensajeError = el('mensaje-error-otros-activos');
-  const lista = el('lista-otros-activos');
-  if (!estado || !mensajeError || !lista) return;
-
-  try {
-    const [datosCompartidos, idsLocales] = await Promise.all([obtenerDatosCompartidos(), _idsGlobalesLocales(db.cargues)]);
-    const otros = carguesActivosDeOtrosDispositivos(datosCompartidos, idsLocales);
-    mensajeError.hidden = true;
-    estado.textContent = otros.length
-      ? `Actualizado: ${new Date().toLocaleString('es-CO')}`
-      : `Ningún otro dispositivo tiene cargues activos ahora mismo (actualizado: ${new Date().toLocaleString('es-CO')}).`;
-    lista.innerHTML = otros.map(renderizarFilaCargueCompartido).join('');
-  } catch (error) {
-    estado.textContent = '';
-    mensajeError.textContent = error.message || 'No se pudo traer lo de otros dispositivos.';
-    mensajeError.hidden = false;
-  }
-}
-
-// Igual que la anterior, pero para "Historial" — cargues terminales + descargues de otros dispositivos.
-async function actualizarOtrosDispositivosHistorial() {
-  const estado = el('estado-otros-historial');
-  const mensajeError = el('mensaje-error-otros-historial');
-  const listaCargues = el('lista-otros-historial-cargues');
-  const listaDescargues = el('lista-otros-historial-descargues');
-  if (!estado || !mensajeError || !listaCargues || !listaDescargues) return;
-
-  try {
-    const [datosCompartidos, idsCarguesLocales, idsDescarguesLocales] = await Promise.all([
-      obtenerDatosCompartidos(),
-      _idsGlobalesLocales(db.cargues),
-      _idsGlobalesLocales(db.descargues),
-    ]);
-    const otrosCargues = carguesHistorialDeOtrosDispositivos(datosCompartidos, idsCarguesLocales);
-    const otrosDescargues = descarguesDeOtrosDispositivos(datosCompartidos, idsDescarguesLocales);
-    mensajeError.hidden = true;
-    estado.textContent =
-      otrosCargues.length || otrosDescargues.length
-        ? `Actualizado: ${new Date().toLocaleString('es-CO')}`
-        : `Ningún otro dispositivo tiene historial todavía (actualizado: ${new Date().toLocaleString('es-CO')}).`;
-    listaCargues.innerHTML = otrosCargues.map(renderizarFilaCargueCompartido).join('');
-    listaDescargues.innerHTML = otrosDescargues.map(renderizarFilaDescargueCompartido).join('');
-  } catch (error) {
-    estado.textContent = '';
-    mensajeError.textContent = error.message || 'No se pudo traer lo de otros dispositivos.';
-    mensajeError.hidden = false;
-  }
-}
 
 function detenerAutoRefrescoCompartido() {
   if (_intervaloAutoRefrescoCompartido) {
@@ -691,15 +653,20 @@ function detenerAutoRefrescoCompartido() {
   }
 }
 
-// Un solo intervalo compartido entre "Cargues activos" e "Historial": en cada vuelta revisa cuál de las
-// dos pantallas está abierta en ese momento y refresca solo esa (nunca las dos a la vez). Se arranca la
-// primera vez que se entra a cualquiera de las dos (ver mostrarPantalla) y NO se reinicia si ya estaba
-// corriendo — así seguir yendo y viniendo entre esas pantallas no reinicia el conteo del minuto.
+// Un solo intervalo compartido entre las tres pantallas: en cada vuelta revisa cuál está abierta en ese
+// momento y refresca solo esa (nunca varias a la vez). Se arranca la primera vez que se entra a
+// cualquiera de ellas (ver mostrarPantalla) y NO se reinicia si ya estaba corriendo — así seguir yendo y
+// viniendo entre esas pantallas no reinicia el conteo del minuto.
 function iniciarAutoRefrescoCompartidoSiHaceFalta() {
   if (_intervaloAutoRefrescoCompartido) return;
   _intervaloAutoRefrescoCompartido = setInterval(() => {
-    if (!el('pantalla-principal').hidden) actualizarOtrosDispositivosActivos();
-    else if (!el('pantalla-historial').hidden) actualizarOtrosDispositivosHistorial();
+    if (!el('pantalla-principal').hidden) renderizarListaCargues();
+    else if (!el('pantalla-historial').hidden) {
+      renderizarListaHistorial();
+      renderizarListaDescarguesHistorial();
+    } else if (!el('pantalla-indicadores').hidden) {
+      renderizarIndicadores(el('campo-filtro-periodo').value);
+    }
   }, AUTO_REFRESCO_COMPARTIDO_MS);
 }
 
@@ -1401,6 +1368,98 @@ async function abrirDetalleCargue(cargueId, origen) {
   mostrarPantalla('pantalla-detalle-cargue');
 }
 
+// FASE N23 — detalle de SOLO LECTURA para un cargue que se registró en OTRO celular (no existe en este
+// dispositivo, así que no hay nada que editar aquí). Responde directamente al reclamo del supervisor:
+// "la información de checklist no me muestra a qué placa, fecha, cliente pertenece" — antes una tarjeta
+// de otro dispositivo no se podía abrir; ahora se toca igual que cualquier otra tarjeta y muestra la
+// identificación completa (placa, cliente, destino, conductor, fecha) más el checklist y las paradas de
+// ESE cargue, con la misma presentación que el detalle normal.
+async function abrirDetalleCargueRemoto(idGlobal, origen) {
+  if (origen) origenDetalleCargue = origen;
+
+  const { datos, error } = await obtenerDatosCompartidosSeguro();
+  if (error) {
+    window.alert('No se pudo traer el detalle de ese cargue: ' + error);
+    return;
+  }
+  const cargue = (datos.cargues || []).find((c) => c.id === idGlobal);
+  if (!cargue) {
+    window.alert('Ya no se encuentra ese cargue (puede que se haya corregido desde el otro celular).');
+    return;
+  }
+  const paradas = (datos.paradas || []).filter((p) => p.cargue_id === idGlobal);
+  const checklist = (datos.checklist || [])
+    .filter((r) => r.cargue_id === idGlobal)
+    .sort((a, b) => (Number(a.orden) || 0) - (Number(b.orden) || 0));
+
+  el('contenido-detalle-cargue').innerHTML = `
+    <div class="fila"><span>Estado</span><span>${cargue.estado || '—'}</span></div>
+    <div class="fila"><span>Fecha</span><span>${cargue.fecha || '—'}</span></div>
+    <div class="fila"><span>Cliente</span><span>${cargue.cliente || '—'}</span></div>
+    <div class="fila"><span>Destino</span><span>${cargue.destino_ciudad || '—'}</span></div>
+    <div class="fila"><span>Vehículo</span><span>${cargue.placa || '—'}</span></div>
+    <div class="fila"><span>Conductor</span><span>${cargue.conductor || '—'}</span></div>
+    ${cargue.hora_inicio_cargue ? `<div class="fila"><span>Inicio cargue</span><span>${cargue.hora_inicio_cargue}</span></div>` : ''}
+    ${cargue.hora_fin_cargue ? `<div class="fila"><span>Fin cargue</span><span>${cargue.hora_fin_cargue}</span></div>` : ''}
+  `;
+
+  el('seccion-checklist').innerHTML = checklist.length
+    ? `<div class="seccion-checklist checklist-solo-lectura">
+        <h2>Checklist — ${cargue.resultado_checklist || 'Sin resultado'}</h2>
+        ${checklist
+          .map(
+            (r) => `
+          <div class="item-checklist-lectura">
+            <span>${r.orden || ''}. ${r.item || ''}</span>
+            <span class="valor-respuesta">${r.respuesta || '—'}</span>
+            ${r.observacion ? `<p class="observacion-lectura">${r.observacion}</p>` : ''}
+          </div>`,
+          )
+          .join('')}
+      </div>`
+    : '';
+
+  const paradasCerradas = paradas.filter((p) => p.hora_fin);
+  el('seccion-tiempos').innerHTML = `
+    <div class="seccion-tiempos">
+      <div class="formulario-parada">
+        <h2>Resumen del cargue</h2>
+        <div class="fila"><span>Tiempo total</span><span>${formatearDuracion(Math.round((Number(cargue.tiempo_total_min) || 0) * 60))}</span></div>
+        <div class="fila"><span>Tiempo detenido</span><span>${formatearDuracion(Math.round((Number(cargue.tiempo_detenido_min) || 0) * 60))}</span></div>
+        <div class="fila"><span>Tiempo productivo</span><span>${formatearDuracion(Math.round((Number(cargue.tiempo_productivo_min) || 0) * 60))}</span></div>
+        <div class="fila"><span>Paradas registradas</span><span>${cargue.cantidad_paradas || 0}</span></div>
+        ${
+          cargue.canastillas_encajables !== '' && cargue.canastillas_encajables != null
+            ? `<div class="fila"><span>Canastillas encajables</span><span>${cargue.canastillas_encajables}</span></div>
+               <div class="fila"><span>Canastillas grandes</span><span>${cargue.canastillas_grandes || 0}</span></div>
+               <div class="fila"><span>Canastillas pequeñas</span><span>${cargue.canastillas_pequenas || 0}</span></div>`
+            : ''
+        }
+      </div>
+      ${
+        paradasCerradas.length
+          ? `<div class="historial-paradas"><h3>Detalle de paradas</h3>${paradasCerradas
+              .map(
+                (p, i) => `
+        <div class="fila-parada">
+          <div class="fila-parada-encabezado">
+            <span class="causa-parada">Parada ${i + 1} — ${p.causa || 'Sin causa'}</span>
+            <span class="duracion-parada">${formatearDuracion(Math.round((Number(p.duracion_min) || 0) * 60))}</span>
+          </div>
+          <div class="detalle-parada">${p.categoria || ''} · ${p.responsable || ''} · ${p.hora_inicio || ''}${p.hora_fin ? ' – ' + p.hora_fin : ''}</div>
+          ${p.observaciones ? `<p class="observacion-parada">${p.observaciones}</p>` : ''}
+          ${p.descripcion_otros ? `<p class="observacion-parada">${p.descripcion_otros}</p>` : ''}
+        </div>`,
+              )
+              .join('')}</div>`
+          : ''
+      }
+      <p class="nota-fase">Este cargue se registró en otro celular — aquí solo se puede consultar, no editar.</p>
+    </div>`;
+
+  mostrarPantalla('pantalla-detalle-cargue');
+}
+
 // ---------------------------------------------------------------------------------------------------
 // PANTALLA: DESCARGUE DE CANASTAS (Fase N11) — registro operativo separado del cargue.
 // ---------------------------------------------------------------------------------------------------
@@ -1864,10 +1923,6 @@ async function iniciar() {
   el('boton-volver-desde-indicadores').addEventListener('click', iniciarPantallaPrincipal);
   el('campo-filtro-periodo').addEventListener('change', () => renderizarIndicadores(el('campo-filtro-periodo').value));
   el('boton-generar-pdf-tablero').addEventListener('click', generarPdfTablero);
-
-  // ---- En otros dispositivos (Fase N19) — botones "Actualizar" manuales, además del refresco automático ----
-  el('boton-actualizar-otros-activos').addEventListener('click', () => actualizarOtrosDispositivosActivos());
-  el('boton-actualizar-otros-historial').addEventListener('click', () => actualizarOtrosDispositivosHistorial());
 
   el('campo-cliente').addEventListener('change', (e) => poblarSelectDestinos(e.target.value));
   manejarSeleccionConOpcionNueva('campo-vehiculo', 'bloque-nuevo-vehiculo');
