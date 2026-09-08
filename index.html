@@ -3,38 +3,737 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
-  <title>Despachos Guapa — Piloto</title>
+  <title>Despachos Guapa — En línea</title>
 
-  <!-- FASE N13 — hace que la app se pueda "Instalar" desde el navegador (ícono propio, pantalla
-       completa, funciona sin internet tras la primera visita) y sea reconocible por PWABuilder u otra
-       herramienta similar para generar un .apk. Ver sw.js y manifest.json. -->
-  <link rel="manifest" href="./manifest.json" />
-  <meta name="theme-color" content="#1c6b3a" />
-  <link rel="icon" href="./icons/icon-192.png" />
-  <link rel="apple-touch-icon" href="./icons/icon-180.png" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Despachos Guapa" />
+  <!-- Ícono de la app: aparece en la pestaña del navegador, al instalarla en
+       el celular, y como logo al compartir el link. -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1b6b3b">
 
-  <link rel="stylesheet" href="./css/estilos.css" />
+  <!-- Vista previa al compartir el link (WhatsApp, correo, etc.). Ya
+       apunta a tu link de GitHub Pages. Si algún día cambias de repositorio
+       o de usuario en GitHub, actualiza las 3 líneas de abajo. -->
+  <meta property="og:title" content="Despachos Guapa">
+  <meta property="og:description" content="Gestión de cosecha y despachos — Agrícola Guapa">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://logisticaguapa-arch.github.io/despachos-guapa/">
+  <meta property="og:image" content="https://logisticaguapa-arch.github.io/despachos-guapa/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Despachos Guapa">
+  <meta name="twitter:description" content="Gestión de cosecha y despachos — Agrícola Guapa">
+  <meta name="twitter:image" content="https://logisticaguapa-arch.github.io/despachos-guapa/og-image.png">
+
+  <style>
+/* Mismos estilos de la versión anterior — mobile-first, sin frameworks. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  color: #1c2a22;
+  /* Fondo con un patrón sutil de camiones (el mismo logo de la app), para que
+     no se sienta una pantalla en blanco sin volverse ruidoso ni afectar la
+     lectura — por eso la opacidad es tan baja. */
+  background-color: #f4f6f5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='120' viewBox='0 0 150 120'%3E%3Cg fill='%231c6b3a' fill-opacity='0.04'%3E%3Crect x='12' y='38' width='62' height='38' rx='4'/%3E%3Cpath d='M74 50h23l17 17v9H74z'/%3E%3Ccircle cx='30' cy='80' r='10'/%3E%3Ccircle cx='100' cy='80' r='10'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+.pantalla { min-height: 100vh; }
+
+[hidden] { display: none !important; }
+
+/* ---- Login ---- */
+#pantalla-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.tarjeta-login {
+  width: 100%;
+  max-width: 360px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 28px 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.tarjeta-login h1 {
+  margin: 0 0 2px 0;
+  font-size: 22px;
+  color: #1c6b3a;
+}
+
+.logo-login {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 12px auto;
+  border-radius: 14px;
+}
+
+.subtitulo {
+  margin: 0 0 20px 0;
+  color: #5b6b60;
+  font-size: 14px;
+}
+
+label {
+  display: block;
+  margin: 14px 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+input[type="text"], input[type="password"], input[type="time"], input[type="date"], input[type="number"], input[type="url"], textarea, select {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px; /* evita zoom automático en iOS */
+  border: 1px solid #cfd8d2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.boton-primario {
+  width: 100%;
+  margin-top: 22px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  background: #1c6b3a;
+  border: none;
+  border-radius: 8px;
+}
+.boton-primario:disabled { opacity: 0.6; }
+
+.boton-primario:active { background: #144e2a; }
+
+.boton-texto {
+  background: none;
+  border: none;
+  color: #1c6b3a;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px;
+}
+
+.mensaje-error {
+  margin-top: 12px;
+  color: #b3261e;
+  font-size: 14px;
+  text-align: center;
+}
+
+.mensaje-ok {
+  margin-top: 12px;
+  color: #1c6b3a;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ---- Pantalla principal ---- */
+.encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: linear-gradient(135deg, #1c6b3a 0%, #164f2b 100%);
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+/* Marca de agua sutil de un camión en la esquina del encabezado, solo
+   decorativa (no interfiere con el texto ni los botones porque queda
+   detrás, con opacidad baja). */
+.encabezado::after {
+  content: "";
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 90px;
+  height: 90px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90'%3E%3Cg fill='%23ffffff' fill-opacity='0.12'%3E%3Crect x='6' y='30' width='42' height='26' rx='3'/%3E%3Cpath d='M48 38h16l12 12v6H48z'/%3E%3Ccircle cx='20' cy='58' r='7'/%3E%3Ccircle cx='68' cy='58' r='7'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+.encabezado h1 { margin: 0; font-size: 17px; white-space: nowrap; position: relative; z-index: 1; }
+.encabezado .boton-texto { color: #fff; position: relative; z-index: 1; }
+.acciones-encabezado { display: flex; gap: 0; align-items: center; position: relative; z-index: 1; }
+.acciones-encabezado .boton-texto { font-size: 12px; padding: 8px 5px; white-space: nowrap; }
+
+.aviso-vacio {
+  padding: 32px 20px;
+  text-align: center;
+  color: #5b6b60;
+}
+.nota-fase { font-size: 13px; color: #8a978f; }
+
+.pie-diagnostico { padding: 16px; text-align: center; }
+#panel-catalogos {
+  margin-top: 12px;
+  text-align: left;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+}
+#panel-catalogos ul { margin: 0; padding-left: 18px; }
+
+.acciones-respaldo {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 18px;
+}
+.acciones-respaldo .boton-secundario { flex: 1; max-width: 160px; }
+
+/* ---- Lista de cargues activos ---- */
+.contenedor-lista { padding: 12px 16px 90px 16px; }
+
+.lista-cargues { list-style: none; margin: 0; padding: 0; }
+
+.tarjeta-cargue {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  font-family: inherit;
+}
+
+.tarjeta-cargue .fila-superior {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.tarjeta-cargue .placa { font-size: 17px; font-weight: 700; }
+
+.tarjeta-cargue .cliente-destino { color: #4a5750; font-size: 14px; }
+
+.etiqueta-estado {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #6b7d72;
+}
+.etiqueta-estado.en-cargue { background: #1c6b3a; }
+.etiqueta-estado.en-parada { background: #b3701e; }
+.etiqueta-estado.rechazado { background: #b3261e; }
+.etiqueta-estado.finalizado { background: #3a5a6b; }
+
+/* ---- Botón flotante "+" ---- */
+.boton-flotante {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #1c6b3a;
+  color: #fff;
+  font-size: 30px;
+  line-height: 58px;
+  text-align: center;
+  border: none;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  padding: 0;
+}
+
+/* ---- Formularios ---- */
+.formulario { padding: 16px; max-width: 480px; margin: 0 auto; }
+
+.bloque-agregar-rapido {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.bloque-agregar-rapido input { flex: 1; }
+
+.boton-secundario {
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1c6b3a;
+  background: #e7f1ea;
+  border: 1px solid #1c6b3a;
+  border-radius: 8px;
+}
+.boton-secundario:disabled { opacity: 0.6; }
+
+.boton-peligro {
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #b3261e;
+  background: #f7e6e2;
+  border: 1px solid #b3261e;
+  border-radius: 8px;
+}
+.acciones-respaldo .boton-peligro { flex: 1; max-width: 220px; }
+
+.contenido-detalle {
+  padding: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.contenido-detalle .fila {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #e3e8e5;
+}
+.contenido-detalle .fila span:first-child { color: #5b6b60; }
+.contenido-detalle .fila span:last-child { font-weight: 600; }
+
+/* ---- Checklist ---- */
+.seccion-checklist { margin-top: 8px; }
+.seccion-checklist h2 {
+  font-size: 16px;
+  margin: 0 0 12px 0;
+  color: #1c6b3a;
+}
+
+.item-checklist {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.item-checklist .texto-item {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.opciones-respuesta {
+  display: flex;
+  gap: 8px;
+}
+.boton-opcion {
+  flex: 1;
+  padding: 10px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4a5750;
+  background: #eef1ef;
+  border: 1px solid #d5dcd8;
+  border-radius: 8px;
+}
+.boton-opcion.seleccionada {
+  background: #1c6b3a;
+  border-color: #1c6b3a;
+  color: #fff;
+}
+
+.campo-observacion-item {
+  width: 100%;
+  margin-top: 10px;
+  min-height: 60px;
+  resize: vertical;
+}
+
+#boton-finalizar-checklist { margin-top: 4px; }
+
+.checklist-solo-lectura {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.item-checklist-lectura {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e3e8e5;
+  font-size: 14px;
+}
+.item-checklist-lectura:last-child { border-bottom: none; }
+.item-checklist-lectura .valor-respuesta { font-weight: 700; color: #1c6b3a; }
+.item-checklist-lectura .observacion-lectura {
+  flex-basis: 100%;
+  margin: 0;
+  color: #5b6b60;
+  font-size: 13px;
+}
+
+/* ---- Tiempos y paradas ---- */
+.seccion-tiempos { margin-top: 8px; }
+.seccion-tiempos h2 {
+  font-size: 16px;
+  margin: 0 0 12px 0;
+  color: #1c6b3a;
+}
+.seccion-tiempos h3 {
+  font-size: 14px;
+  margin: 18px 0 10px 0;
+  color: #4a5750;
+}
+
+.fila-hora {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.fila-hora input { flex: 1; }
+.fila-hora .boton-secundario { flex: 0 0 auto; }
+
+.formulario-parada {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.aviso-sin-paradas {
+  color: #5b6b60;
+  font-size: 14px;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.fila-parada {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.fila-parada-abierta { border: 1px solid #b3701e; }
+.fila-parada-encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.causa-parada { font-weight: 700; font-size: 14px; }
+.duracion-parada { font-weight: 700; color: #1c6b3a; font-size: 13px; }
+.detalle-parada { color: #5b6b60; font-size: 13px; margin-top: 2px; }
+.observacion-parada { margin: 6px 0 0 0; font-size: 13px; color: #4a5750; }
+
+.mensaje-confirmacion {
+  background: #e7f1ea;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0 0 14px 0;
+  font-weight: 600;
+}
+
+.acciones-fila-parada {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #e3e8e5;
+}
+.boton-enlace {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c6b3a;
+}
+.boton-enlace-peligro { color: #b3261e; }
+#boton-cancelar-parada.boton-enlace-peligro {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin-top: 10px;
+}
+
+/* ---- Indicadores ---- */
+.etiqueta-filtro {
+  margin: 4px 0 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5750;
+}
+#campo-filtro-periodo { margin-bottom: 16px; }
+
+.aviso-vacio-inline {
+  text-align: center;
+  color: #5b6b60;
+  font-size: 14px;
+  padding: 20px 0;
+}
+
+.fila-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.tarjeta-kpi {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 10px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.valor-kpi { font-size: 22px; font-weight: 700; color: #1c6b3a; }
+.etiqueta-kpi { font-size: 12px; color: #5b6b60; }
+
+.fila-ranking { margin-bottom: 14px; }
+.fila-ranking:last-child { margin-bottom: 0; }
+.fila-ranking-encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.causa-ranking { font-weight: 600; color: #1c2a22; }
+.valor-ranking { color: #5b6b60; white-space: nowrap; }
+.barra-fondo {
+  background: #e3e8e5;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+}
+.barra-relleno {
+  background: #1c6b3a;
+  height: 100%;
+  border-radius: 4px;
+}
+
+/* Fecha + hora en dos campos separados */
+.fila-fecha-hora {
+  display: flex;
+  gap: 8px;
+}
+.fila-fecha-hora .campo-fecha { flex: 3; }
+.fila-fecha-hora .campo-hora { flex: 2; }
+.fila-fecha-hora label { margin-top: 0; }
+.boton-ahora-fecha-hora {
+  width: 100%;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+/* Selector "+": Cargue o Descargue de canastas */
+.overlay-selector {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 42, 34, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 10;
+}
+.tarjeta-selector {
+  width: 100%;
+  max-width: 340px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 22px 20px;
+}
+.tarjeta-selector h2 {
+  margin: 0 0 16px 0;
+  font-size: 17px;
+  text-align: center;
+  color: #1c6b3a;
+}
+.tarjeta-selector .boton-primario,
+.tarjeta-selector .boton-secundario {
+  margin: 0 0 10px 0;
+}
+.tarjeta-selector .boton-enlace {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+/* Pestañas Cargue / Paradas dentro del detalle de un cargue en curso */
+.tabs-tiempos {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.tab-tiempos {
+  flex: 1;
+  padding: 10px 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #4a5750;
+  background: #eef1ef;
+  border: 1px solid #d5dcd8;
+  border-radius: 8px;
+}
+.tab-tiempos.activa {
+  background: #1c6b3a;
+  border-color: #1c6b3a;
+  color: #fff;
+}
+
+.fila-superior-resumen {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.fila-superior-resumen h2 { margin: 0; }
+
+.titulo-herramientas {
+  font-size: 14px;
+  color: #4a5750;
+  text-align: center;
+  margin: 18px 0 4px 0;
+}
+#panel-herramientas { margin-top: 10px; }
+
+.subtitulo-historial {
+  font-size: 15px;
+  color: #1c6b3a;
+  margin: 22px 0 10px 0;
+}
+
+.etiqueta-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 14px 0 4px 0;
+}
+.etiqueta-checkbox input { width: auto; }
+
+.fila-filtro-tablero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fila-filtro-tablero .boton-secundario { white-space: nowrap; }
+
+.grafica-barras-dias {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px 2px 0 2px;
+  min-height: 130px;
+}
+.barra-dia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 32px;
+}
+.barra-dia-valor {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1c6b3a;
+  height: 14px;
+}
+.barra-dia-columna {
+  width: 18px;
+  height: 90px;
+  display: flex;
+  align-items: flex-end;
+  background: #eef1ef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.barra-dia-relleno {
+  width: 100%;
+  background: #1c6b3a;
+  border-radius: 4px 4px 0 0;
+}
+.barra-dia-etiqueta {
+  font-size: 10px;
+  color: #6b7a71;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+.encabezado-impresion { display: none; }
+
+/* Aviso de conexión (nuevo en la versión en línea): se ve cuando falla la
+   última consulta al Google Sheet — el trabajo no se pierde, solo avisa. */
+.aviso-conexion {
+  background: #f7e6e2;
+  color: #8a2a1e;
+  font-size: 13px;
+  text-align: center;
+  padding: 8px 12px;
+}
+
+@media print {
+  body * { visibility: hidden; }
+  #pantalla-indicadores, #pantalla-indicadores * { visibility: visible; }
+  #pantalla-indicadores {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+  }
+  #pantalla-indicadores .encabezado,
+  #pantalla-indicadores .fila-filtro-tablero,
+  #boton-generar-pdf-tablero {
+    display: none !important;
+  }
+  .encabezado-impresion {
+    display: block;
+    margin-bottom: 12px;
+  }
+  .encabezado-impresion h1 {
+    font-size: 18px;
+    color: #1c6b3a;
+    margin: 0 0 4px 0;
+  }
+  .encabezado-impresion p {
+    font-size: 12px;
+    color: #4a5750;
+    margin: 0 0 10px 0;
+  }
+  .formulario-parada { break-inside: avoid; }
+}
+
+  </style>
 </head>
 <body>
+
+  <div id="aviso-conexion" class="aviso-conexion" hidden></div>
 
   <!-- ============ PANTALLA: ACCESO ============ -->
   <section id="pantalla-login" class="pantalla">
     <div class="tarjeta-login">
+      <img src="icon-192.png" alt="" class="logo-login" />
       <h1>Agrícola Guapa</h1>
-      <p class="subtitulo">Piloto operativo — Despachos</p>
+      <p class="subtitulo">Despachos — en línea</p>
 
       <form id="form-login">
-        <label for="campo-usuario">Usuario</label>
-        <input id="campo-usuario" type="text" autocomplete="username" autocapitalize="none" required />
-
         <label for="campo-password">Contraseña</label>
         <input id="campo-password" type="password" autocomplete="current-password" required />
 
-        <button type="submit" class="boton-primario">Ingresar</button>
-        <p id="mensaje-error-login" class="mensaje-error" hidden>Usuario o contraseña incorrectos.</p>
+        <button type="submit" class="boton-primario" id="boton-ingresar">Ingresar</button>
+        <p id="mensaje-error-login" class="mensaje-error" hidden></p>
       </form>
     </div>
   </section>
@@ -53,7 +752,7 @@
     <div class="contenedor-lista">
       <div id="lista-cargues-vacio" class="aviso-vacio" hidden>
         <p>Todavía no hay cargues activos.</p>
-        <p class="nota-fase">Toca "Nuevo cargue" para crear el primero.</p>
+        <p class="nota-fase">Toca "+" para crear el primero.</p>
       </div>
       <ul id="lista-cargues" class="lista-cargues"></ul>
     </div>
@@ -64,7 +763,7 @@
       <div class="tarjeta-selector">
         <h2>¿Qué quieres registrar?</h2>
         <button type="button" id="boton-elegir-cargue" class="boton-primario">Cargue</button>
-        <button type="button" id="boton-elegir-descargue" class="boton-secundario">Descargue de canastas</button>
+        <button type="button" id="boton-elegir-descargue" class="boton-primario">Descargue de canastas</button>
         <button type="button" id="boton-cancelar-selector" class="boton-enlace">Cancelar</button>
       </div>
     </div>
@@ -79,40 +778,42 @@
         <div class="acciones-respaldo">
           <button id="boton-gestionar-causas" class="boton-secundario">Gestionar causas de tiempos muertos</button>
         </div>
-
-        <h3 class="titulo-herramientas">Google Sheets (sincronización automática)</h3>
-        <p id="estado-sheets" class="nota-fase"></p>
         <div class="acciones-respaldo">
-          <button id="boton-configurar-sheets" class="boton-secundario">Configurar enlace</button>
-          <button id="boton-reintentar-sheets" class="boton-secundario">Sincronizar ahora</button>
+          <button id="boton-gestionar-catalogos" class="boton-secundario">Vehículos, conductores y clientes</button>
         </div>
-        <div id="panel-configurar-sheets" class="bloque-agregar-rapido" hidden>
-          <label for="campo-url-sheets">Enlace de la implementación (termina en /exec)</label>
-          <input id="campo-url-sheets" type="url" placeholder="https://script.google.com/macros/s/..../exec" />
-          <button type="button" id="boton-guardar-url-sheets" class="boton-secundario">Guardar enlace</button>
+
+        <h3 class="titulo-herramientas">Instalar en el celular</h3>
+        <p class="nota-fase">
+          Instala Despachos Guapa como una aplicación: va a quedar con su propio ícono en la pantalla de
+          inicio, como cualquier otra app, y se abre directo sin pasar por el navegador.
+        </p>
+        <div class="acciones-respaldo">
+          <button id="boton-instalar-app" class="boton-secundario">📲 Descargar aplicación en tu celular</button>
         </div>
-        <p id="mensaje-sheets" class="mensaje-error" hidden></p>
-        <p id="mensaje-sheets-ok" class="mensaje-ok" hidden></p>
+        <p id="mensaje-instalar" class="nota-fase" hidden></p>
+
+        <h3 class="titulo-herramientas">Conexión con Google Sheets</h3>
+        <p id="estado-conexion" class="nota-fase"></p>
 
         <h3 class="titulo-herramientas">Copia de seguridad</h3>
-        <p id="estado-almacenamiento" class="nota-fase"></p>
+        <p class="nota-fase">
+          Toda la información ya vive en la hoja de Google Sheets compartida — esta descarga es solo un
+          respaldo extra en tu celular, por si acaso.
+        </p>
         <div class="acciones-respaldo">
-          <button id="boton-respaldar-datos" class="boton-secundario">Respaldar datos</button>
-          <button id="boton-restaurar-datos" class="boton-secundario">Restaurar datos</button>
-          <input type="file" id="campo-archivo-restaurar" accept="application/json" hidden />
+          <button id="boton-respaldar-datos" class="boton-secundario">Descargar copia (.json)</button>
         </div>
         <p id="mensaje-respaldo" class="mensaje-error" hidden></p>
         <p id="mensaje-respaldo-ok" class="mensaje-ok" hidden></p>
 
         <h3 class="titulo-herramientas">Antes de arrancar producción</h3>
         <p class="nota-fase">
-          Borra el historial operativo (cargues, paradas, checklist y descargues) guardado en ESTE
-          celular — pensado para limpiar los datos de prueba antes de empezar a usar la app en serio. No
-          toca tus catálogos (clientes, vehículos, conductores, etc.) ni lo que ya subiste a Google
-          Sheets.
+          Borra el historial operativo COMPARTIDO (cargues, paradas, checklist y descargues de TODOS los
+          celulares) — pensado para limpiar los datos de prueba una sola vez, antes de que todo el equipo
+          empiece a usar la app en serio. No toca los catálogos (clientes, vehículos, conductores, causas).
         </p>
         <div class="acciones-respaldo">
-          <button id="boton-borrar-prueba" class="boton-peligro">🗑 Borrar datos de prueba</button>
+          <button id="boton-borrar-prueba" class="boton-peligro">🗑 Borrar datos de prueba (compartido)</button>
         </div>
         <p id="mensaje-borrar-prueba" class="mensaje-error" hidden></p>
         <p id="mensaje-borrar-prueba-ok" class="mensaje-ok" hidden></p>
@@ -141,6 +842,7 @@
       <select id="campo-destino" required disabled>
         <option value="" disabled selected>Primero elige el cliente</option>
       </select>
+      <input id="campo-destino-manual" type="text" placeholder="Escribe la ciudad o el punto de entrega" hidden />
 
       <label for="campo-vehiculo">Vehículo (placa)</label>
       <select id="campo-vehiculo" required>
@@ -167,7 +869,7 @@
     </form>
   </section>
 
-  <!-- ============ PANTALLA: DESCARGUE DE CANASTAS (Fase N11) ============ -->
+  <!-- ============ PANTALLA: DESCARGUE DE CANASTAS ============ -->
   <section id="pantalla-nuevo-descargue" class="pantalla" hidden>
     <header class="encabezado">
       <button id="boton-volver-desde-descargue" class="boton-texto">‹ Volver</button>
@@ -191,6 +893,7 @@
       <select id="campo-descargue-destino" required disabled>
         <option value="" disabled selected>Primero elige el cliente</option>
       </select>
+      <input id="campo-descargue-destino-manual" type="text" placeholder="Escribe la ciudad o el punto de entrega" hidden />
 
       <label for="campo-descargue-vehiculo">Vehículo (placa)</label>
       <select id="campo-descargue-vehiculo" required>
@@ -231,8 +934,6 @@
       <p id="mensaje-error-descargue" class="mensaje-error" hidden></p>
     </form>
 
-    <!-- FASE N12 — tras guardar, se queda aquí mostrando la confirmación en vez de regresar sola de
-         una vez a la pantalla principal (ver feedback del piloto real). -->
     <div id="confirmacion-descargue" class="formulario-parada" hidden>
       <p class="mensaje-ok mensaje-confirmacion">✓ Descargue guardado correctamente.</p>
       <button type="button" id="boton-otro-descargue" class="boton-secundario">Registrar otro descargue</button>
@@ -240,7 +941,7 @@
     </div>
   </section>
 
-  <!-- ============ PANTALLA: GESTIÓN DE CAUSAS (Fase N11) ============ -->
+  <!-- ============ PANTALLA: GESTIÓN DE CAUSAS ============ -->
   <section id="pantalla-gestion-causas" class="pantalla" hidden>
     <header class="encabezado">
       <button id="boton-volver-desde-causas" class="boton-texto">‹ Volver</button>
@@ -276,7 +977,57 @@
     </div>
   </section>
 
-  <!-- ============ PANTALLA: TABLERO OPERATIVO (Fase N6, ampliado en Fase N12) ============ -->
+  <!-- ============ PANTALLA: VEHÍCULOS, CONDUCTORES Y CLIENTES ============ -->
+  <section id="pantalla-gestion-catalogos" class="pantalla" hidden>
+    <header class="encabezado">
+      <button id="boton-volver-desde-catalogos" class="boton-texto">‹ Volver</button>
+      <h1>Vehículos, conductores y clientes</h1>
+      <span></span>
+    </header>
+
+    <div class="contenedor-lista">
+      <h2>Vehículos</h2>
+      <div id="lista-vehiculos"></div>
+      <div class="formulario-parada">
+        <h3>Agregar vehículo nuevo</h3>
+        <label for="campo-nuevo-vehiculo-placa">Placa</label>
+        <input id="campo-nuevo-vehiculo-placa" type="text" placeholder="Ej: ABC123" autocapitalize="characters" />
+        <button type="button" id="boton-agregar-vehiculo-catalogo" class="boton-primario">Agregar vehículo</button>
+        <p id="mensaje-error-vehiculos" class="mensaje-error" hidden></p>
+      </div>
+
+      <h2>Conductores</h2>
+      <div id="lista-conductores"></div>
+      <div class="formulario-parada">
+        <h3>Agregar conductor nuevo</h3>
+        <label for="campo-nuevo-conductor-nombre">Nombre completo</label>
+        <input id="campo-nuevo-conductor-nombre" type="text" placeholder="Nombre completo" />
+        <button type="button" id="boton-agregar-conductor-catalogo" class="boton-primario">Agregar conductor</button>
+        <p id="mensaje-error-conductores" class="mensaje-error" hidden></p>
+      </div>
+
+      <h2>Clientes y mayoristas</h2>
+      <p class="nota-fase">
+        Un cliente normal (PDV, ÉXITO, ARA…) elige el destino de una lista fija. Un mayorista no tiene
+        destinos fijos: al crear un cargue o un descargue para un mayorista, el destino se escribe a mano.
+      </p>
+      <div id="lista-clientes"></div>
+      <div class="formulario-parada">
+        <h3>Agregar cliente nuevo</h3>
+        <label for="campo-nuevo-cliente-nombre">Nombre</label>
+        <input id="campo-nuevo-cliente-nombre" type="text" placeholder="Nombre del cliente o mayorista" />
+        <label for="campo-nuevo-cliente-categoria">Tipo</label>
+        <select id="campo-nuevo-cliente-categoria">
+          <option value="ESTANDAR">Cliente (destinos de una lista fija)</option>
+          <option value="MAYORISTA">Mayorista (el destino se escribe a mano)</option>
+        </select>
+        <button type="button" id="boton-agregar-cliente-catalogo" class="boton-primario">Agregar cliente</button>
+        <p id="mensaje-error-clientes" class="mensaje-error" hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PANTALLA: TABLERO OPERATIVO ============ -->
   <section id="pantalla-indicadores" class="pantalla" hidden>
     <header class="encabezado">
       <button id="boton-volver-desde-indicadores" class="boton-texto">‹ Volver</button>
@@ -298,14 +1049,13 @@
         <button type="button" id="boton-generar-pdf-tablero" class="boton-secundario">Descargar informe (PDF)</button>
       </div>
 
-      <!-- Solo visible al imprimir/generar el PDF (ver @media print en estilos.css) -->
       <div id="encabezado-impresion-tablero" class="encabezado-impresion"></div>
 
       <div id="contenido-indicadores"></div>
     </div>
   </section>
 
-  <!-- ============ PANTALLA: HISTORIAL (Fase N5) ============ -->
+  <!-- ============ PANTALLA: HISTORIAL ============ -->
   <section id="pantalla-historial" class="pantalla" hidden>
     <header class="encabezado">
       <button id="boton-volver-desde-historial" class="boton-texto">‹ Volver</button>
@@ -340,39 +1090,2214 @@
     <div id="seccion-checklist" class="contenido-detalle"></div>
 
     <div id="seccion-tiempos" class="contenido-detalle"></div>
-
-    <div class="aviso-vacio">
-      <p class="nota-fase">Exportación a Excel/PDF (Fase N7) queda pendiente para más adelante.</p>
-    </div>
   </section>
 
-  <script src="./vendor/dexie.min.js"></script>
-  <script src="./js/db.js"></script>
-  <script src="./js/auth.js"></script>
-  <script src="./js/estado.js"></script>
-  <script src="./js/cargues.js"></script>
-  <script src="./js/checklist.js"></script>
-  <script src="./js/causas.js"></script>
-  <script src="./js/tiempos.js"></script>
-  <script src="./js/descargues.js"></script>
-  <script src="./js/indicadores.js"></script>
-  <script src="./js/respaldo.js"></script>
-  <script src="./js/sync-sheets.js"></script>
-  <script src="./js/consolidado.js"></script>
-  <script src="./js/app.js"></script>
-
-  <!-- FASE N13 — registra el service worker (ver sw.js) SOLO cuando la app se abre por http(s), como
-       en GitHub Pages: si se abre el archivo .html suelto (file://) o el paquete de un solo archivo
-       (empaquetar_standalone.py), esto simplemente no hace nada — el resto de la app sigue funcionando
-       exactamente igual, con o sin service worker. -->
   <script>
-    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch((error) => {
-          console.warn('No se pudo registrar el service worker (la app funciona igual, solo sin modo sin conexión):', error);
-        });
+/* ===========================================================================
+   DESPACHOS GUAPA — VERSIÓN EN LÍNEA (cliente)
+
+   Esta app YA NO guarda nada en el celular (no hay IndexedDB/Dexie): en cada
+   apertura y después de cada acción, trae el estado completo desde el Google
+   Sheet (a través de Codigo.gs) y trabaja sobre esa copia en memoria. Todo lo
+   que se guarda va DIRECTO a la hoja compartida — así cualquier supervisor
+   con el enlace ve y continúa el trabajo de los demás.
+
+   Contrapartida de este diseño ("simple", como se pidió): cada acción que
+   guarda algo necesita señal en ese momento. Si no hay señal, se avisa con un
+   mensaje claro y no se pierde lo que se estaba escribiendo en el formulario
+   — pero tampoco queda guardado hasta volver a intentarlo.
+=========================================================================== */
+
+// URL de la implementación de Apps Script (Codigo.gs) ya configurada.
+// Si el día de mañana vuelves a publicar una NUEVA implementación (en vez de
+// una nueva versión de la misma, ver GUIA_DESPLIEGUE.md) esta línea es la
+// única que habría que actualizar.
+const URL_API = 'https://script.google.com/macros/s/AKfycbz1pLWWzv9mkXTbOyp_Ol1Ul2TwowDPVsc-O-ZgzL-MdfTWc3sB90oBHjYFjVlRQmxDFQ/exec';
+
+// Registra el service worker mínimo (ver sw.js): solo habilita el botón de
+// "instalar aplicación", no agrega modo sin conexión ni cambia nada más.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// El navegador dispara este evento cuando decide que la app cumple los
+// requisitos para instalarse (Android/Chrome). Lo guardamos para poder
+// mostrar el cuadro de instalación cuando el usuario toque el botón.
+let promptInstalacionApp = null;
+window.addEventListener('beforeinstallprompt', (evento) => {
+  evento.preventDefault();
+  promptInstalacionApp = evento;
+});
+window.addEventListener('appinstalled', () => {
+  promptInstalacionApp = null;
+});
+
+function el(id) {
+  return document.getElementById(id);
+}
+
+// ---------------------------------------------------------------------------
+// ESTADO EN MEMORIA — una sola copia de todo lo que hay en el Sheet. Se
+// reemplaza completa cada vez que se llama cargarEstadoCompleto().
+// ---------------------------------------------------------------------------
+let ESTADO = {
+  clientes: [], destinos: [], vehiculos: [], conductores: [], categoriasParada: [],
+  responsables: [], tiposTiempo: [], causasParada: [], checklistItems: [],
+  cargues: [], paradas: [], checklistRespuestas: [], descargues: [],
+};
+
+// Actualiza (o agrega) UN registro dentro de ESTADO, sin tener que volver a
+// pedirle a Google la información completa de las 13 hojas. Cada acción que
+// guarda algo recibe de vuelta el registro ya actualizado (ver Codigo.gs) y
+// lo aplica aquí — así la pantalla siguiente aparece de inmediato, sin
+// esperar un segundo viaje de red solo para refrescar.
+function _aplicarEnEstado(nombreLista, registro) {
+  if (!registro) return;
+  const lista = ESTADO[nombreLista];
+  const idx = lista.findIndex((x) => x.id === registro.id);
+  if (idx === -1) lista.push(registro); else lista[idx] = registro;
+}
+function _quitarDeEstado(nombreLista, id) {
+  const lista = ESTADO[nombreLista];
+  const idx = lista.findIndex((x) => x.id === id);
+  if (idx !== -1) lista.splice(idx, 1);
+}
+
+// ---- Acceso (contraseña compartida, verificada por el servidor) -----------
+
+const LLAVE_LOCAL_HASH = 'guapaDespachosPasswordHash';
+let passwordHashActual = null;
+
+async function sha256Hex(texto) {
+  const datos = new TextEncoder().encode(texto);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', datos);
+  return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ---- Cliente HTTP hacia Codigo.gs ------------------------------------------
+
+async function apiGet(accion, parametros = {}) {
+  const query = new URLSearchParams({ accion, passwordHash: passwordHashActual || '', ...parametros }).toString();
+  let respuestaCruda;
+  try {
+    respuestaCruda = await fetch(`${URL_API}?${query}`);
+  } catch (error) {
+    throw new Error('No hay conexión a internet en este momento.');
+  }
+  let datos;
+  try {
+    datos = await respuestaCruda.json();
+  } catch (error) {
+    throw new Error('El servidor no respondió como se esperaba. Revisa la URL configurada en el archivo (URL_API).');
+  }
+  if (!datos.ok) throw new Error(datos.error || 'El servidor rechazó la consulta.');
+  return datos;
+}
+
+// Content-Type 'text/plain' a propósito: evita que el navegador mande un
+// preflight OPTIONS (Apps Script no lo responde) y la petición fallaría.
+async function apiPost(accion, payload = {}) {
+  let respuestaCruda;
+  try {
+    respuestaCruda = await fetch(URL_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ accion, passwordHash: passwordHashActual, ...payload }),
+    });
+  } catch (error) {
+    throw new Error('No hay conexión a internet en este momento. Lo que escribiste no se guardó — inténtalo de nuevo.');
+  }
+  let datos;
+  try {
+    datos = await respuestaCruda.json();
+  } catch (error) {
+    throw new Error('El servidor no respondió como se esperaba.');
+  }
+  if (!datos.ok) throw new Error(datos.error || 'No se pudo guardar.');
+  return datos;
+}
+
+async function verificarAcceso(password) {
+  const hash = await sha256Hex(password || '');
+  const respuesta = await apiPost('verificarAcceso', { passwordHash: hash });
+  if (respuesta.ok) passwordHashActual = hash;
+  return respuesta.ok;
+}
+
+function mostrarAvisoConexion(mensaje) {
+  const aviso = el('aviso-conexion');
+  if (!mensaje) { aviso.hidden = true; return; }
+  aviso.textContent = mensaje;
+  aviso.hidden = false;
+}
+
+async function cargarEstadoCompleto() {
+  const respuesta = await apiGet('estado');
+  ESTADO = respuesta.estado;
+  mostrarAvisoConexion(null);
+  const nota = el('estado-conexion');
+  if (nota) nota.textContent = `Conectado. Última actualización: ${new Date().toLocaleTimeString('es-CO')}.`;
+}
+
+async function cargarEstadoCompletoSeguro() {
+  try {
+    await cargarEstadoCompleto();
+    return true;
+  } catch (error) {
+    mostrarAvisoConexion('Sin conexión con la hoja compartida en este momento — se sigue viendo lo último que se pudo traer.');
+    const nota = el('estado-conexion');
+    if (nota) nota.textContent = `Última consulta falló: ${error.message}`;
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MÁQUINA DE ESTADOS DEL CARGUE (para decidir qué mostrar en pantalla — la
+// validación real de cada transición la hace también el servidor).
+// ---------------------------------------------------------------------------
+const ESTADOS_TERMINALES = ['FINALIZADO', 'CERRADO', 'RECHAZADO'];
+function esCargueActivo(estado) { return !ESTADOS_TERMINALES.includes(estado); }
+
+const ETIQUETA_ESTADO = {
+  PENDIENTE: 'Pendiente', CHECKLIST: 'En checklist', APROBADO: 'Aprobado', RECHAZADO: 'Rechazado',
+  EN_CARGUE: 'En cargue', EN_PARADA: 'En parada', FINALIZADO: 'Finalizado', CERRADO: 'Cerrado',
+};
+const ETIQUETA_RESPUESTA_CHECKLIST = { CUMPLE: 'Cumple', NO_CUMPLE: 'No cumple', NO_APLICA: 'No aplica' };
+const ETIQUETA_TIPO_TIEMPO = {
+  TIEMPO_MUERTO: 'Tiempo muerto', ESPERA: 'Espera', REPROCESO: 'Reproceso', ACTIVIDAD_OPERATIVA: 'Actividad operativa',
+};
+
+function claseEstado(estado) {
+  if (estado === 'EN_CARGUE') return 'en-cargue';
+  if (estado === 'EN_PARADA') return 'en-parada';
+  if (estado === 'RECHAZADO') return 'rechazado';
+  if (estado === 'FINALIZADO' || estado === 'CERRADO') return 'finalizado';
+  return '';
+}
+
+// ---------------------------------------------------------------------------
+// UTILIDADES DE FECHA/HORA LOCALES — igual criterio de siempre: nunca UTC en
+// pantalla; el ISO con "Z" solo viaja por dentro para los cálculos.
+// ---------------------------------------------------------------------------
+
+function fechaLocalHoyISO() {
+  const ahora = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${ahora.getFullYear()}-${pad(ahora.getMonth() + 1)}-${pad(ahora.getDate())}`;
+}
+
+function datetimeLocalDeAhora() {
+  const ahora = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${ahora.getFullYear()}-${pad(ahora.getMonth() + 1)}-${pad(ahora.getDate())}T${pad(ahora.getHours())}:${pad(ahora.getMinutes())}`;
+}
+
+function fechaDeDatetimeLocal(valor) {
+  if (!valor) return null;
+  const fecha = new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return null;
+  return fecha;
+}
+
+function datetimeLocalDeISO(iso) {
+  if (!iso) return '';
+  const fecha = new Date(iso);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}T${pad(fecha.getHours())}:${pad(fecha.getMinutes())}`;
+}
+
+function formatearHora(iso) {
+  if (!iso) return '—';
+  const fecha = new Date(iso);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(fecha.getHours())}:${pad(fecha.getMinutes())}`;
+}
+
+function formatearDuracion(segundosTotales) {
+  if (segundosTotales == null || segundosTotales === '' || segundosTotales < 0) return '—';
+  const horas = Math.floor(segundosTotales / 3600);
+  const minutos = Math.floor((segundosTotales % 3600) / 60);
+  if (horas > 0) return `${horas}h ${minutos}m`;
+  return `${minutos}m`;
+}
+
+function separarFechaHora(datetimeLocal) {
+  const [fecha, hora] = (datetimeLocal || '').split('T');
+  return { fecha: fecha || '', hora: hora || '' };
+}
+
+function campoFechaHoraHTML(idPrefix, datetimeLocalInicial) {
+  const { fecha, hora } = separarFechaHora(datetimeLocalInicial);
+  return `
+    <div class="fila-fecha-hora">
+      <div class="campo-fecha">
+        <label for="${idPrefix}-fecha">Fecha</label>
+        <input id="${idPrefix}-fecha" type="date" value="${fecha}" />
+      </div>
+      <div class="campo-hora">
+        <label for="${idPrefix}-hora">Hora</label>
+        <input id="${idPrefix}-hora" type="time" value="${hora}" />
+      </div>
+    </div>
+    <button type="button" class="boton-secundario boton-ahora-fecha-hora" data-prefix="${idPrefix}">Ahora</button>`;
+}
+
+function leerFechaHora(idPrefix) {
+  const campoFecha = el(`${idPrefix}-fecha`);
+  const campoHora = el(`${idPrefix}-hora`);
+  if (!campoFecha || !campoHora || !campoFecha.value || !campoHora.value) return '';
+  return `${campoFecha.value}T${campoHora.value}`;
+}
+
+function wireBotonesAhoraFechaHora(contenedor) {
+  contenedor.querySelectorAll('.boton-ahora-fecha-hora').forEach((boton) => {
+    boton.addEventListener('click', () => {
+      const prefix = boton.dataset.prefix;
+      const { fecha, hora } = separarFechaHora(datetimeLocalDeAhora());
+      el(`${prefix}-fecha`).value = fecha;
+      el(`${prefix}-hora`).value = hora;
+    });
+  });
+}
+
+// Convierte lo digitado en el formulario ("YYYY-MM-DDTHH:MM", hora local del
+// celular) al string ISO/UTC que espera el servidor.
+function isoDesdeLocal(datetimeLocalStr) {
+  const fecha = fechaDeDatetimeLocal(datetimeLocalStr);
+  return fecha ? fecha.toISOString() : null;
+}
+
+// ---------------------------------------------------------------------------
+// CARGUES — lectura desde ESTADO (en memoria) + escritura vía apiPost.
+// ---------------------------------------------------------------------------
+
+function _cargesConDetalle(cargues) {
+  const clientePorId = Object.fromEntries(ESTADO.clientes.map((c) => [c.id, c]));
+  const destinoPorId = Object.fromEntries(ESTADO.destinos.map((d) => [d.id, d]));
+  const vehiculoPorId = Object.fromEntries(ESTADO.vehiculos.map((v) => [v.id, v]));
+  const conductorPorId = Object.fromEntries(ESTADO.conductores.map((c) => [c.id, c]));
+  return cargues.map((c) => ({
+    ...c,
+    clienteNombre: clientePorId[c.clienteId]?.nombre ?? '(cliente eliminado)',
+    destinoCiudad: destinoPorId[c.destinoId]?.ciudad ?? '(destino eliminado)',
+    placa: vehiculoPorId[c.vehiculoId]?.placa ?? '(vehículo eliminado)',
+    conductorNombre: conductorPorId[c.conductorId]?.nombreCompleto ?? '(conductor eliminado)',
+  }));
+}
+
+function listarCarguesActivosConDetalle() {
+  const activos = ESTADO.cargues.filter((c) => esCargueActivo(c.estado));
+  activos.sort((a, b) => new Date(b.creadoEn) - new Date(a.creadoEn));
+  return _cargesConDetalle(activos);
+}
+
+function listarCarguesFinalizadosConDetalle() {
+  const finalizados = ESTADO.cargues.filter((c) => !esCargueActivo(c.estado));
+  finalizados.sort((a, b) => new Date(b.actualizadoEn) - new Date(a.actualizadoEn));
+  return _cargesConDetalle(finalizados);
+}
+
+async function crearCargue({ clienteId, destinoId, destinoManual, vehiculoId, conductorId, fecha }) {
+  if (!clienteId || !(destinoId || destinoManual) || !vehiculoId || !conductorId || !fecha) {
+    throw new Error('Faltan datos obligatorios para crear el cargue.');
+  }
+  const respuesta = await apiPost('crearCargue', { clienteId, destinoId, destinoManual, vehiculoId, conductorId, fecha });
+  _aplicarEnEstado('cargues', respuesta.cargue);
+  return respuesta.cargue.id;
+}
+
+async function editarAsignacionCargue(cargueId, { vehiculoId, conductorId }) {
+  const respuesta = await apiPost('editarAsignacionCargue', { cargueId, vehiculoId, conductorId });
+  _aplicarEnEstado('cargues', respuesta.cargue);
+}
+
+async function agregarVehiculoRapido(placa) {
+  const respuesta = await apiPost('agregarVehiculo', { placa });
+  _aplicarEnEstado('vehiculos', respuesta.vehiculo);
+  return respuesta.vehiculo.id;
+}
+
+async function agregarConductorRapido(nombreCompleto) {
+  const respuesta = await apiPost('agregarConductor', { nombreCompleto });
+  _aplicarEnEstado('conductores', respuesta.conductor);
+  return respuesta.conductor.id;
+}
+
+// ---------------------------------------------------------------------------
+// CHECKLIST
+// ---------------------------------------------------------------------------
+
+async function asegurarChecklistCreado(cargueId) {
+  const existentes = ESTADO.checklistRespuestas.filter((r) => r.cargueId === cargueId);
+  if (existentes.length > 0) return;
+  const respuesta = await apiPost('crearChecklist', { cargueId });
+  (respuesta.respuestas || []).forEach((r) => _aplicarEnEstado('checklistRespuestas', r));
+  _aplicarEnEstado('cargues', respuesta.cargue);
+}
+
+function obtenerChecklistDeCargue(cargueId) {
+  return ESTADO.checklistRespuestas
+    .filter((r) => r.cargueId === cargueId)
+    .sort((a, b) => a.ordenSnapshot - b.ordenSnapshot);
+}
+
+async function responderItemChecklist(respuestaId, respuesta, observacion) {
+  const resultado = await apiPost('responderChecklist', { respuestaId, respuesta, observacion: (observacion || '').trim() });
+  _aplicarEnEstado('checklistRespuestas', resultado.respuesta);
+}
+
+async function finalizarChecklist(cargueId) {
+  const respuesta = await apiPost('finalizarChecklist', { cargueId });
+  _aplicarEnEstado('cargues', respuesta.cargue);
+  return respuesta;
+}
+
+// ---------------------------------------------------------------------------
+// CAUSAS DE PARADA
+// ---------------------------------------------------------------------------
+
+function listarCategoriasParadaTodas() {
+  return [...ESTADO.categoriasParada].sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+function listarResponsablesTodos() {
+  return [...ESTADO.responsables].sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+function listarTiposTiempoTodos() {
+  return ESTADO.tiposTiempo;
+}
+
+function _causasConDetalle(causas) {
+  const categoriaPorId = Object.fromEntries(ESTADO.categoriasParada.map((c) => [c.id, c]));
+  const responsablePorId = Object.fromEntries(ESTADO.responsables.map((r) => [r.id, r]));
+  const tipoTiempoPorId = Object.fromEntries(ESTADO.tiposTiempo.map((t) => [t.id, t]));
+  return causas
+    .map((c) => ({
+      ...c,
+      categoriaNombre: categoriaPorId[c.categoriaId]?.nombre ?? '(sin categoría)',
+      responsableNombre: responsablePorId[c.responsableId]?.nombre ?? '(sin responsable)',
+      tipoTiempoNombre: tipoTiempoPorId[c.tipoTiempoId]?.nombre ?? '(sin tipo)',
+    }))
+    .sort((a, b) => a.categoriaNombre.localeCompare(b.categoriaNombre) || a.nombre.localeCompare(b.nombre));
+}
+
+function listarTodasLasCausasConDetalle() {
+  return _causasConDetalle(ESTADO.causasParada);
+}
+function listarCausasParadaConDetalle() {
+  return _causasConDetalle(ESTADO.causasParada.filter((c) => c.activo));
+}
+
+async function agregarCausa(datos) {
+  const respuesta = await apiPost('agregarCausa', datos);
+  _aplicarEnEstado('causasParada', respuesta.causa);
+}
+async function editarCausa(causaId, datos) {
+  const respuesta = await apiPost('editarCausa', { causaId, ...datos });
+  _aplicarEnEstado('causasParada', respuesta.causa);
+}
+
+// ---------------------------------------------------------------------------
+// TIEMPOS Y PARADAS
+// ---------------------------------------------------------------------------
+
+function obtenerParadaAbierta(cargueId) {
+  return ESTADO.paradas.find((p) => p.cargueId === cargueId && !p.horaFin) ?? null;
+}
+function listarParadasDeCargue(cargueId) {
+  return ESTADO.paradas
+    .filter((p) => p.cargueId === cargueId)
+    .sort((a, b) => new Date(a.horaInicio) - new Date(b.horaInicio));
+}
+
+async function iniciarCargue(cargueId, horaInicioLocalStr) {
+  const horaInicioISO = isoDesdeLocal(horaInicioLocalStr);
+  if (!horaInicioISO) throw new Error('Indica la hora de inicio del cargue.');
+  const respuesta = await apiPost('iniciarCargue', { cargueId, horaInicioISO });
+  _aplicarEnEstado('cargues', respuesta.cargue);
+}
+
+async function registrarParada(cargueId, { causaId, horaInicioLocalStr, observaciones, descripcionOtros }) {
+  const horaInicioISO = isoDesdeLocal(horaInicioLocalStr);
+  if (!horaInicioISO) throw new Error('Indica la hora de inicio de la parada.');
+  const respuesta = await apiPost('registrarParada', { cargueId, causaId, horaInicioISO, observaciones, descripcionOtros });
+  _aplicarEnEstado('paradas', respuesta.parada);
+  _aplicarEnEstado('cargues', respuesta.cargue);
+}
+
+async function finalizarParada(paradaId, horaFinLocalStr) {
+  const horaFinISO = isoDesdeLocal(horaFinLocalStr);
+  if (!horaFinISO) throw new Error('Indica la hora de fin de la parada.');
+  const respuesta = await apiPost('finalizarParada', { paradaId, horaFinISO });
+  _aplicarEnEstado('paradas', respuesta.parada);
+  _aplicarEnEstado('cargues', respuesta.cargue);
+  return respuesta;
+}
+
+async function editarParada(paradaId, { causaId, horaInicioLocalStr, horaFinLocalStr, observaciones, descripcionOtros }) {
+  const horaInicioISO = isoDesdeLocal(horaInicioLocalStr);
+  if (!horaInicioISO) throw new Error('Indica la hora de inicio de la parada.');
+  const parada = ESTADO.paradas.find((p) => p.id === paradaId);
+  let horaFinISO = null;
+  if (parada && parada.horaFin) {
+    horaFinISO = isoDesdeLocal(horaFinLocalStr);
+    if (!horaFinISO) throw new Error('Indica la hora de fin de la parada.');
+  }
+  const respuesta = await apiPost('editarParada', { paradaId, causaId, horaInicioISO, horaFinISO, observaciones, descripcionOtros });
+  _aplicarEnEstado('paradas', respuesta.parada);
+  _aplicarEnEstado('cargues', respuesta.cargue);
+}
+
+async function eliminarParada(paradaId) {
+  const respuesta = await apiPost('eliminarParada', { paradaId });
+  _quitarDeEstado('paradas', respuesta.paradaId);
+  _aplicarEnEstado('cargues', respuesta.cargue);
+}
+
+async function finalizarCargue(cargueId, horaFinLocalStr, canastillas) {
+  const horaFinISO = isoDesdeLocal(horaFinLocalStr);
+  if (!horaFinISO) throw new Error('Indica la hora de fin del cargue.');
+  const respuesta = await apiPost('finalizarCargue', { cargueId, horaFinISO, canastillas });
+  _aplicarEnEstado('cargues', respuesta.cargue);
+}
+
+async function editarHorasCargue(cargueId, { horaInicioLocalStr, horaFinLocalStr }) {
+  const horaInicioISO = isoDesdeLocal(horaInicioLocalStr);
+  const horaFinISO = isoDesdeLocal(horaFinLocalStr);
+  if (!horaInicioISO || !horaFinISO) throw new Error('Indica la hora de inicio y de fin del cargue.');
+  const respuesta = await apiPost('editarHorasCargue', { cargueId, horaInicioISO, horaFinISO });
+  _aplicarEnEstado('cargues', respuesta.cargue);
+}
+
+// ---------------------------------------------------------------------------
+// DESCARGUE DE CANASTAS
+// ---------------------------------------------------------------------------
+
+function listarDescarguesConDetalle() {
+  const clientePorId = Object.fromEntries(ESTADO.clientes.map((c) => [c.id, c]));
+  const destinoPorId = Object.fromEntries(ESTADO.destinos.map((d) => [d.id, d]));
+  const vehiculoPorId = Object.fromEntries(ESTADO.vehiculos.map((v) => [v.id, v]));
+  const conductorPorId = Object.fromEntries(ESTADO.conductores.map((c) => [c.id, c]));
+  const descargues = [...ESTADO.descargues];
+  descargues.sort((a, b) => new Date(b.horaInicio) - new Date(a.horaInicio));
+  return descargues.map((d) => ({
+    ...d,
+    clienteNombre: clientePorId[d.clienteId]?.nombre ?? '(cliente eliminado)',
+    destinoCiudad: destinoPorId[d.destinoId]?.ciudad ?? (d.destinoId ? '(destino eliminado)' : '—'),
+    placa: vehiculoPorId[d.vehiculoId]?.placa ?? '(vehículo eliminado)',
+    conductorNombre: conductorPorId[d.conductorId]?.nombreCompleto ?? '(conductor eliminado)',
+  }));
+}
+
+async function crearDescargue(datos) {
+  const payload = {
+    ...datos,
+    horaInicioISO: isoDesdeLocal(datos.horaInicioLocalStr),
+    horaFinISO: isoDesdeLocal(datos.horaFinLocalStr),
+  };
+  if (!payload.horaInicioISO || !payload.horaFinISO) throw new Error('Indica la hora de inicio y de fin.');
+  const respuesta = await apiPost('crearDescargue', payload);
+  _aplicarEnEstado('descargues', respuesta.descargue);
+}
+
+async function editarDescargue(descargueId, datos) {
+  const payload = {
+    descargueId,
+    ...datos,
+    horaInicioISO: isoDesdeLocal(datos.horaInicioLocalStr),
+    horaFinISO: isoDesdeLocal(datos.horaFinLocalStr),
+  };
+  if (!payload.horaInicioISO || !payload.horaFinISO) throw new Error('Indica la hora de inicio y de fin.');
+  const respuesta = await apiPost('editarDescargue', payload);
+  _aplicarEnEstado('descargues', respuesta.descargue);
+}
+
+// ---------------------------------------------------------------------------
+// INDICADORES / TABLERO OPERATIVO — ahora se calculan directo sobre ESTADO,
+// porque ya no existen "datos locales" vs "datos de otros celulares": todo
+// viene de la misma hoja.
+// ---------------------------------------------------------------------------
+
+function rangoDeFiltroIndicadores(filtro) {
+  const hoy = fechaLocalHoyISO();
+  const comoISO = (fecha) => `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+  if (filtro === 'hoy') return { desde: hoy, hasta: hoy };
+  if (filtro === '7dias') {
+    const desde = new Date();
+    desde.setDate(desde.getDate() - 6);
+    return { desde: comoISO(desde), hasta: hoy };
+  }
+  if (filtro === 'mes') {
+    const desde = new Date();
+    desde.setDate(1);
+    return { desde: comoISO(desde), hasta: hoy };
+  }
+  return { desde: null, hasta: null };
+}
+
+function _carguesFinalizadosConDetalle() {
+  return _cargesConDetalle(ESTADO.cargues.filter((c) => c.estado === 'FINALIZADO' || c.estado === 'CERRADO'));
+}
+function _paradasCerradas() {
+  return ESTADO.paradas.filter((p) => p.horaFin);
+}
+
+function calcularIndicadores(filtro) {
+  const carguesFinalizados = _carguesFinalizadosConDetalle();
+  const { desde, hasta } = rangoDeFiltroIndicadores(filtro);
+  const enRango = carguesFinalizados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
+
+  if (enRango.length === 0) {
+    return { cantidadCargues: 0, promedioTiempoTotal: 0, promedioTiempoDetenido: 0, promedioPorcentajeProductivo: 0, ranking: [] };
+  }
+
+  const cantidadCargues = enRango.length;
+  const sumaTotal = enRango.reduce((s, c) => s + (Number(c.tiempoTotalCargue) || 0), 0);
+  const sumaDetenido = enRango.reduce((s, c) => s + (Number(c.tiempoDetenidoTotal) || 0), 0);
+  const promedioTiempoTotal = Math.round(sumaTotal / cantidadCargues);
+  const promedioTiempoDetenido = Math.round(sumaDetenido / cantidadCargues);
+
+  const porcentajes = enRango
+    .filter((c) => Number(c.tiempoTotalCargue) > 0)
+    .map((c) => (Number(c.tiempoProductivoCargue) / Number(c.tiempoTotalCargue)) * 100);
+  const promedioPorcentajeProductivo = porcentajes.length
+    ? Math.round(porcentajes.reduce((s, p) => s + p, 0) / porcentajes.length)
+    : 0;
+
+  const idsCargueEnRango = new Set(enRango.map((c) => c.id));
+  const paradasEnRango = _paradasCerradas().filter((p) => idsCargueEnRango.has(p.cargueId));
+
+  const acumuladoPorCausa = {};
+  for (const p of paradasEnRango) {
+    const clave = p.causaNombreSnapshot;
+    if (!acumuladoPorCausa[clave]) acumuladoPorCausa[clave] = { causa: clave, duracionTotal: 0, cantidad: 0 };
+    acumuladoPorCausa[clave].duracionTotal += Number(p.duracionSegundos) || 0;
+    acumuladoPorCausa[clave].cantidad += 1;
+  }
+  const ranking = Object.values(acumuladoPorCausa).sort((a, b) => b.duracionTotal - a.duracionTotal).slice(0, 6);
+
+  return { cantidadCargues, promedioTiempoTotal, promedioTiempoDetenido, promedioPorcentajeProductivo, ranking };
+}
+
+function calcularIndicadoresDescargue(filtro) {
+  const { desde, hasta } = rangoDeFiltroIndicadores(filtro);
+  const enRango = ESTADO.descargues.filter((d) => (!desde || d.fecha >= desde) && (!hasta || d.fecha <= hasta));
+  return {
+    cantidadDescargues: enRango.length,
+    tiempoTotalSegundos: enRango.reduce((s, d) => s + (Number(d.duracionSegundos) || 0), 0),
+    canastillasEncajables: enRango.reduce((s, d) => s + (Number(d.canastillasEncajables) || 0), 0),
+    canastillasGrandes: enRango.reduce((s, d) => s + (Number(d.canastillasGrandes) || 0), 0),
+    canastillasPequenas: enRango.reduce((s, d) => s + (Number(d.canastillasPequenas) || 0), 0),
+  };
+}
+
+function _fechaISO(fecha) {
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+}
+const MAX_DIAS_SERIE_TODO = 30;
+
+function calcularSerieDiariaCargues(filtro) {
+  const carguesFinalizados = _carguesFinalizadosConDetalle();
+  const { desde, hasta } = rangoDeFiltroIndicadores(filtro);
+  let enRango = carguesFinalizados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
+  if (enRango.length === 0) return [];
+
+  let fechaDesde = desde;
+  let fechaHasta = hasta;
+  if (!fechaDesde || !fechaHasta) {
+    const fechasOrdenadas = [...new Set(enRango.map((c) => c.fecha))].sort();
+    fechaHasta = fechasOrdenadas[fechasOrdenadas.length - 1];
+    const idx = Math.max(0, fechasOrdenadas.length - MAX_DIAS_SERIE_TODO);
+    fechaDesde = fechasOrdenadas[idx];
+    enRango = enRango.filter((c) => c.fecha >= fechaDesde);
+  }
+
+  const acumuladoPorFecha = {};
+  for (const c of enRango) {
+    if (!acumuladoPorFecha[c.fecha]) acumuladoPorFecha[c.fecha] = { cantidad: 0, tiempoProductivo: 0 };
+    acumuladoPorFecha[c.fecha].cantidad += 1;
+    acumuladoPorFecha[c.fecha].tiempoProductivo += Number(c.tiempoProductivoCargue) || 0;
+  }
+
+  const serie = [];
+  const cursor = new Date(fechaDesde + 'T00:00:00');
+  const fin = new Date(fechaHasta + 'T00:00:00');
+  while (cursor <= fin) {
+    const iso = _fechaISO(cursor);
+    const entrada = acumuladoPorFecha[iso];
+    serie.push({ fecha: iso, cantidad: entrada?.cantidad || 0, tiempoProductivo: entrada?.tiempoProductivo || 0 });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return serie;
+}
+
+function calcularComparativoPorVehiculo(filtro) {
+  const carguesFinalizados = _carguesFinalizadosConDetalle();
+  const { desde, hasta } = rangoDeFiltroIndicadores(filtro);
+  const enRango = carguesFinalizados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
+  if (enRango.length === 0) return [];
+  const acumulado = {};
+  for (const c of enRango) {
+    const clave = c.placa || '(vehículo eliminado)';
+    if (!acumulado[clave]) acumulado[clave] = { placa: clave, cantidad: 0, tiempoTotal: 0, tiempoDetenido: 0 };
+    acumulado[clave].cantidad += 1;
+    acumulado[clave].tiempoTotal += Number(c.tiempoTotalCargue) || 0;
+    acumulado[clave].tiempoDetenido += Number(c.tiempoDetenidoTotal) || 0;
+  }
+  return Object.values(acumulado)
+    .map((v) => ({ ...v, tiempoTotalPromedio: Math.round(v.tiempoTotal / v.cantidad) }))
+    .sort((a, b) => b.cantidad - a.cantidad)
+    .slice(0, 8);
+}
+
+function calcularComparativoPorCliente(filtro) {
+  const carguesFinalizados = _carguesFinalizadosConDetalle();
+  const { desde, hasta } = rangoDeFiltroIndicadores(filtro);
+  const enRango = carguesFinalizados.filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta));
+  if (enRango.length === 0) return [];
+  const acumulado = {};
+  for (const c of enRango) {
+    const clave = c.clienteNombre || '(cliente eliminado)';
+    if (!acumulado[clave]) acumulado[clave] = { clienteNombre: clave, cantidad: 0, tiempoTotal: 0 };
+    acumulado[clave].cantidad += 1;
+    acumulado[clave].tiempoTotal += Number(c.tiempoTotalCargue) || 0;
+  }
+  return Object.values(acumulado)
+    .map((c) => ({ ...c, tiempoTotalPromedio: Math.round(c.tiempoTotal / c.cantidad) }))
+    .sort((a, b) => b.cantidad - a.cantidad);
+}
+
+// ---------------------------------------------------------------------------
+// COPIA DE SEGURIDAD — ahora es solo una descarga informativa de lo que ya
+// hay en ESTADO (la hoja de Google es la copia real). Sirve como respaldo
+// adicional en el celular de cada supervisor.
+// ---------------------------------------------------------------------------
+
+function nombreArchivoRespaldo() {
+  const ahora = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `respaldo-guapa-${ahora.getFullYear()}-${pad(ahora.getMonth() + 1)}-${pad(ahora.getDate())}-${pad(ahora.getHours())}${pad(ahora.getMinutes())}.json`;
+}
+
+function descargarRespaldoComoArchivo() {
+  const contenido = JSON.stringify({ app: 'guapa-en-linea', fechaRespaldo: new Date().toISOString(), datos: ESTADO }, null, 2);
+  const blob = new Blob([contenido], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = nombreArchivoRespaldo();
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
+  URL.revokeObjectURL(url);
+}
+
+function contarDatosOperativos() {
+  return ESTADO.cargues.length + ESTADO.paradas.length + ESTADO.checklistRespuestas.length + ESTADO.descargues.length;
+}
+
+async function borrarDatosOperativos() {
+  await apiPost('borrarDatosOperativos', {});
+  await cargarEstadoCompleto();
+}
+
+// ===========================================================================
+// PANTALLAS Y NAVEGACIÓN
+// ===========================================================================
+
+function mostrarPantalla(idPantalla) {
+  if (['pantalla-principal', 'pantalla-historial', 'pantalla-indicadores'].includes(idPantalla)) {
+    iniciarAutoRefrescoSiHaceFalta();
+  } else {
+    detenerAutoRefresco();
+  }
+  document.querySelectorAll('.pantalla').forEach((p) => p.setAttribute('hidden', ''));
+  el(idPantalla).removeAttribute('hidden');
+}
+
+let _intervaloAutoRefresco = null;
+const AUTO_REFRESCO_MS = 25000; // 25s — cerca de "en vivo" sin saturar Apps Script
+
+function detenerAutoRefresco() {
+  if (_intervaloAutoRefresco) { clearInterval(_intervaloAutoRefresco); _intervaloAutoRefresco = null; }
+}
+function iniciarAutoRefrescoSiHaceFalta() {
+  if (_intervaloAutoRefresco) return;
+  _intervaloAutoRefresco = setInterval(async () => {
+    const ok = await cargarEstadoCompletoSeguro();
+    if (!ok) return;
+    if (!el('pantalla-principal').hidden) renderizarListaCargues();
+    else if (!el('pantalla-historial').hidden) renderizarListaHistorial();
+    else if (!el('pantalla-indicadores').hidden) renderizarIndicadores(el('campo-filtro-periodo').value);
+  }, AUTO_REFRESCO_MS);
+}
+
+async function mostrarDiagnosticoCatalogos() {
+  const panel = el('panel-catalogos');
+  panel.innerHTML = `<ul>
+    <li>Clientes: ${ESTADO.clientes.length}</li>
+    <li>Destinos: ${ESTADO.destinos.length}</li>
+    <li>Categorías de parada: ${ESTADO.categoriasParada.length}</li>
+    <li>Responsables: ${ESTADO.responsables.length}</li>
+    <li>Tipos de tiempo: ${ESTADO.tiposTiempo.length}</li>
+    <li>Causas de parada: ${ESTADO.causasParada.length}</li>
+    <li>Ítems de checklist: ${ESTADO.checklistItems.length}</li>
+    <li>Vehículos registrados: ${ESTADO.vehiculos.length}</li>
+    <li>Conductores registrados: ${ESTADO.conductores.length}</li>
+  </ul>`;
+  panel.removeAttribute('hidden');
+}
+
+// ---------------------------------------------------------------------------
+// PANTALLA PRINCIPAL — lista de cargues activos (de todos los supervisores).
+// ---------------------------------------------------------------------------
+
+function renderizarFilaCargue(c) {
+  return `
+    <li>
+      <button class="tarjeta-cargue" data-cargue-id="${c.id}">
+        <div class="fila-superior">
+          <span class="placa">${c.placa}</span>
+          <span class="etiqueta-estado ${claseEstado(c.estado)}">${ETIQUETA_ESTADO[c.estado] || c.estado}</span>
+        </div>
+        <div class="cliente-destino">${c.clienteNombre} — ${c.destinoCiudad}${c.fecha ? ' · ' + c.fecha : ''}</div>
+      </button>
+    </li>`;
+}
+
+function wireTarjetasCargue(lista, origenPantalla) {
+  lista.querySelectorAll('.tarjeta-cargue').forEach((boton) => {
+    boton.addEventListener('click', () => abrirDetalleCargue(boton.dataset.cargueId, origenPantalla));
+  });
+}
+
+function _pintarListaCargues(lista, avisoVacio, items, origenPantalla) {
+  if (items.length === 0) {
+    lista.innerHTML = '';
+    avisoVacio.hidden = false;
+    return;
+  }
+  avisoVacio.hidden = true;
+  lista.innerHTML = items.map(renderizarFilaCargue).join('');
+  wireTarjetasCargue(lista, origenPantalla);
+}
+
+function renderizarListaCargues() {
+  const lista = el('lista-cargues');
+  const avisoVacio = el('lista-cargues-vacio');
+  _pintarListaCargues(lista, avisoVacio, listarCarguesActivosConDetalle(), 'principal');
+}
+
+async function iniciarPantallaPrincipal() {
+  mostrarPantalla('pantalla-principal');
+  await cargarEstadoCompletoSeguro();
+  renderizarListaCargues();
+}
+
+// ---------------------------------------------------------------------------
+// PANTALLA: NUEVO CARGUE
+// ---------------------------------------------------------------------------
+
+// Un mayorista (ver Gestionar clientes) no tiene destinos fijos en la lista:
+// para esos, el destino se escribe a mano en vez de elegirse.
+function esClienteMayorista(clienteId) {
+  const cliente = ESTADO.clientes.find((c) => c.id === clienteId);
+  return !!cliente && cliente.categoria === 'MAYORISTA';
+}
+
+function opcionesClientesAgrupadas(clientes) {
+  const estandar = clientes.filter((c) => c.categoria !== 'MAYORISTA');
+  const mayoristas = clientes.filter((c) => c.categoria === 'MAYORISTA');
+  const grupo = (etiqueta, lista) => (lista.length === 0 ? '' : `
+    <optgroup label="${etiqueta}">
+      ${lista.map((c) => `<option value="${c.id}">${c.nombre}</option>`).join('')}
+    </optgroup>`);
+  return grupo('Clientes', estandar) + grupo('Mayoristas', mayoristas);
+}
+
+function poblarSelectClientes() {
+  const clientes = [...ESTADO.clientes].filter((c) => c.estado !== 'INACTIVO').sort((a, b) => a.nombre.localeCompare(b.nombre));
+  el('campo-cliente').innerHTML =
+    '<option value="" disabled selected>Selecciona un cliente</option>' +
+    opcionesClientesAgrupadas(clientes);
+}
+
+function poblarSelectDestinos(clienteId) {
+  const select = el('campo-destino');
+  const manual = el('campo-destino-manual');
+  if (esClienteMayorista(clienteId)) {
+    select.hidden = true;
+    select.disabled = true;
+    select.required = false;
+    select.innerHTML = '<option value="" disabled selected>—</option>';
+    manual.hidden = false;
+    manual.required = true;
+    manual.value = '';
+    return;
+  }
+  select.hidden = false;
+  manual.hidden = true;
+  manual.required = false;
+  manual.value = '';
+  if (!clienteId) {
+    select.innerHTML = '<option value="" disabled selected>Primero elige el cliente</option>';
+    select.disabled = true;
+    select.required = true;
+    return;
+  }
+  const destinos = ESTADO.destinos.filter((d) => d.clienteId === clienteId && d.estado !== 'INACTIVO');
+  select.innerHTML =
+    '<option value="" disabled selected>Selecciona un destino</option>' +
+    destinos.map((d) => `<option value="${d.id}">${d.ciudad}</option>`).join('');
+  select.disabled = false;
+  select.required = true;
+}
+
+function poblarSelectVehiculos(idSeleccionado) {
+  const vehiculos = [...ESTADO.vehiculos].sort((a, b) => a.placa.localeCompare(b.placa));
+  el('campo-vehiculo').innerHTML =
+    '<option value="" disabled selected>Selecciona un vehículo</option>' +
+    vehiculos.map((v) => `<option value="${v.id}">${v.placa}</option>`).join('') +
+    '<option value="__nuevo__">➕ Agregar vehículo nuevo…</option>';
+  if (idSeleccionado) el('campo-vehiculo').value = idSeleccionado;
+}
+
+function poblarSelectConductores(idSeleccionado) {
+  const conductores = [...ESTADO.conductores].sort((a, b) => a.nombreCompleto.localeCompare(b.nombreCompleto));
+  el('campo-conductor').innerHTML =
+    '<option value="" disabled selected>Selecciona un conductor</option>' +
+    conductores.map((c) => `<option value="${c.id}">${c.nombreCompleto}</option>`).join('') +
+    '<option value="__nuevo__">➕ Agregar conductor nuevo…</option>';
+  if (idSeleccionado) el('campo-conductor').value = idSeleccionado;
+}
+
+function manejarSeleccionConOpcionNueva(idSelect, idBloqueNuevo) {
+  el(idSelect).addEventListener('change', (e) => {
+    el(idBloqueNuevo).hidden = e.target.value !== '__nuevo__';
+  });
+}
+
+async function abrirPantallaNuevoCargue() {
+  el('form-nuevo-cargue').reset();
+  el('mensaje-error-cargue').hidden = true;
+  el('bloque-nuevo-vehiculo').hidden = true;
+  el('bloque-nuevo-conductor').hidden = true;
+  el('campo-fecha').value = fechaLocalHoyISO();
+  // Se trae lo más reciente ANTES de llenar los desplegables — si esto no se
+  // espera aquí, es posible entrar a esta pantalla justo en el instante en
+  // que la primera carga de catálogos todavía está en camino y ver los
+  // desplegables vacíos aunque los catálogos sí existan en la hoja.
+  await cargarEstadoCompletoSeguro();
+  poblarSelectClientes();
+  poblarSelectDestinos('');
+  poblarSelectVehiculos();
+  poblarSelectConductores();
+  mostrarPantalla('pantalla-nuevo-cargue');
+}
+
+async function manejarEnvioNuevoCargue(evento) {
+  evento.preventDefault();
+  const mensajeError = el('mensaje-error-cargue');
+  mensajeError.hidden = true;
+  const boton = evento.target.querySelector('button[type="submit"]');
+  boton.disabled = true;
+  try {
+    const clienteId = el('campo-cliente').value;
+    const id = await crearCargue({
+      clienteId,
+      destinoId: esClienteMayorista(clienteId) ? '' : el('campo-destino').value,
+      destinoManual: esClienteMayorista(clienteId) ? el('campo-destino-manual').value : '',
+      vehiculoId: el('campo-vehiculo').value,
+      conductorId: el('campo-conductor').value,
+      fecha: el('campo-fecha').value,
+    });
+    await mostrarDetalleCargueSinRefrescar(id, 'principal');
+  } catch (error) {
+    mensajeError.textContent = error.message || 'No se pudo crear el cargue.';
+    mensajeError.hidden = false;
+  } finally {
+    boton.disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// DETALLE DE CARGUE
+// ---------------------------------------------------------------------------
+
+let origenDetalleCargue = 'principal';
+let vistaTiempos = 'cargue';
+
+// Se usa justo después de crear/guardar algo en ESTE mismo celular: como la
+// respuesta del servidor ya viene aplicada a ESTADO (ver _aplicarEnEstado),
+// no hace falta pedir de nuevo la información completa — eso es lo que
+// hacía sentir lenta la transición a la pantalla siguiente.
+function mostrarDetalleCargueSinRefrescar(cargueId, origenPantalla) {
+  origenDetalleCargue = origenPantalla;
+  vistaTiempos = 'cargue';
+  mostrarPantalla('pantalla-detalle-cargue');
+  return pintarDetalleCargue(cargueId);
+}
+
+// Se usa al abrir un cargue desde una LISTA (Cargues activos / Historial):
+// ahí sí conviene traer lo más reciente primero, porque pudo haberlo tocado
+// otro supervisor desde otro celular.
+async function abrirDetalleCargue(cargueId, origenPantalla) {
+  await cargarEstadoCompletoSeguro();
+  return mostrarDetalleCargueSinRefrescar(cargueId, origenPantalla);
+}
+
+async function pintarDetalleCargue(cargueId) {
+  const [cargueConDetalle] = _cargesConDetalle(ESTADO.cargues.filter((c) => c.id === cargueId));
+  if (!cargueConDetalle) {
+    window.alert('Ya no se encuentra ese cargue (puede que se haya borrado o cerrado desde otro celular).');
+    if (origenDetalleCargue === 'historial') abrirPantallaHistorial(); else iniciarPantallaPrincipal();
+    return;
+  }
+  const cargue = cargueConDetalle;
+
+  el('contenido-detalle-cargue').innerHTML = `
+    <div class="fila"><span>Placa</span><span>${cargue.placa}</span></div>
+    <div class="fila"><span>Conductor</span><span>${cargue.conductorNombre}</span></div>
+    <div class="fila"><span>Cliente</span><span>${cargue.clienteNombre}</span></div>
+    <div class="fila"><span>Destino</span><span>${cargue.destinoCiudad}</span></div>
+    <div class="fila"><span>Fecha</span><span>${cargue.fecha}</span></div>
+    <div class="fila"><span>Estado</span><span>${ETIQUETA_ESTADO[cargue.estado] || cargue.estado}</span></div>`;
+
+  await pintarSeccionChecklist(cargue);
+  await pintarSeccionTiempos(cargue);
+}
+
+// ---- Checklist ----
+
+function opcionesRespuestaHTML(respuestaId, seleccionActual) {
+  return ['CUMPLE', 'NO_CUMPLE', 'NO_APLICA']
+    .map((op) => `<button type="button" class="boton-opcion ${op === seleccionActual ? 'seleccionada' : ''}" data-respuesta-id="${respuestaId}" data-valor="${op}">${ETIQUETA_RESPUESTA_CHECKLIST[op]}</button>`)
+    .join('');
+}
+
+async function pintarSeccionChecklist(cargue) {
+  const contenedor = el('seccion-checklist');
+
+  if (cargue.estado === 'RECHAZADO') {
+    // Cargue rechazado: no llega a la pantalla de pestañas (Cargue/Paradas/
+    // Resumen), así que aquí es el único lugar donde se puede ver el porqué.
+    const checklist = obtenerChecklistDeCargue(cargue.id);
+    if (checklist.length === 0) { contenedor.innerHTML = ''; return; }
+    contenedor.innerHTML = `
+      <h2>Checklist (Rechazado)</h2>
+      <div class="checklist-solo-lectura">
+        ${checklist.map((r) => `
+          <div class="item-checklist-lectura">
+            <span>${r.textoSnapshot}</span>
+            <span class="valor-respuesta">${ETIQUETA_RESPUESTA_CHECKLIST[r.respuesta] || r.respuesta}</span>
+            ${r.observacion ? `<p class="observacion-lectura">${r.observacion}</p>` : ''}
+          </div>`).join('')}
+      </div>`;
+    return;
+  }
+
+  if (['APROBADO', 'EN_CARGUE', 'EN_PARADA', 'FINALIZADO', 'CERRADO'].includes(cargue.estado)) {
+    // Ya se decidió (aprobado): el checklist se ve, de solo lectura, dentro
+    // de la pestaña "Resumen" (ver pintarSeccionTiempos), no aquí.
+    contenedor.innerHTML = '';
+    return;
+  }
+
+  if (cargue.estado === 'PENDIENTE') {
+    await asegurarChecklistCreado(cargue.id);
+  }
+  const checklist = obtenerChecklistDeCargue(cargue.id);
+
+  contenedor.innerHTML = `
+    <h2>Checklist de ingreso</h2>
+    ${checklist.map((r) => `
+      <div class="item-checklist" data-respuesta-id="${r.id}">
+        <p class="texto-item">${r.textoSnapshot}</p>
+        <div class="opciones-respuesta">${opcionesRespuestaHTML(r.id, r.respuesta)}</div>
+        <textarea class="campo-observacion-item" placeholder="Observación${r.requiereObservacionSnapshot ? ' (obligatoria si no cumple)' : ' (opcional)'}" ${r.respuesta === 'NO_CUMPLE' ? '' : 'hidden'}>${r.observacion || ''}</textarea>
+      </div>`).join('')}
+    <button type="button" id="boton-finalizar-checklist" class="boton-primario">Finalizar checklist</button>
+    <p id="mensaje-error-checklist" class="mensaje-error" hidden></p>`;
+
+  contenedor.querySelectorAll('.item-checklist').forEach((item) => {
+    const respuestaId = item.dataset.respuestaId;
+    const textarea = item.querySelector('.campo-observacion-item');
+    item.querySelectorAll('.boton-opcion').forEach((boton) => {
+      boton.addEventListener('click', async () => {
+        const valor = boton.dataset.valor;
+        textarea.hidden = valor !== 'NO_CUMPLE';
+        item.querySelectorAll('.boton-opcion').forEach((b) => b.classList.toggle('seleccionada', b === boton));
+        try {
+          await responderItemChecklist(respuestaId, valor, textarea.value);
+        } catch (error) {
+          window.alert(error.message || 'No se pudo guardar la respuesta.');
+        }
       });
+    });
+    textarea.addEventListener('change', async () => {
+      const seleccionActual = item.querySelector('.boton-opcion.seleccionada')?.dataset.valor;
+      if (!seleccionActual) return;
+      try {
+        await responderItemChecklist(respuestaId, seleccionActual, textarea.value);
+      } catch (error) {
+        window.alert(error.message || 'No se pudo guardar la observación.');
+      }
+    });
+  });
+
+  el('boton-finalizar-checklist').addEventListener('click', async () => {
+    const mensajeError = el('mensaje-error-checklist');
+    mensajeError.hidden = true;
+    const boton = el('boton-finalizar-checklist');
+    boton.disabled = true;
+    try {
+      await finalizarChecklist(cargue.id);
+      await pintarDetalleCargue(cargue.id);
+    } catch (error) {
+      mensajeError.textContent = error.message || 'No se pudo finalizar el checklist.';
+      mensajeError.hidden = false;
+    } finally {
+      boton.disabled = false;
     }
+  });
+}
+
+// ---- Tiempos y paradas ----
+
+function opcionesCausasAgrupadas(causas, seleccionActualId) {
+  const porCategoria = {};
+  causas.forEach((c) => {
+    if (!porCategoria[c.categoriaNombre]) porCategoria[c.categoriaNombre] = [];
+    porCategoria[c.categoriaNombre].push(c);
+  });
+  return Object.keys(porCategoria)
+    .sort()
+    .map((categoria) => `
+      <optgroup label="${categoria}">
+        ${porCategoria[categoria].map((c) => `<option value="${c.id}" ${String(c.id) === String(seleccionActualId) ? 'selected' : ''}>${c.nombre}</option>`).join('')}
+      </optgroup>`)
+    .join('');
+}
+
+function bannerConfirmacionTiempos() {
+  return '';
+}
+
+async function pintarSeccionTiempos(cargue) {
+  const contenedor = el('seccion-tiempos');
+
+  if (!['APROBADO', 'EN_CARGUE', 'EN_PARADA', 'FINALIZADO', 'CERRADO'].includes(cargue.estado)) {
+    contenedor.innerHTML = '';
+    return;
+  }
+
+  // ---------------------------------------------------------------------
+  // Pestaña "Resumen": todo de solo lectura — el checklist ya aprobado, el
+  // listado completo de paradas, y el cargue como tal (inicio/fin y, una
+  // vez finalizado, sus totales).
+  // ---------------------------------------------------------------------
+  const checklistResumen = obtenerChecklistDeCargue(cargue.id);
+  const checklistResumenHTML = checklistResumen.length === 0 ? '' : `
+    <h3>Checklist (${cargue.checklistResultado === 'RECHAZADO' ? 'Rechazado' : 'Aprobado'})</h3>
+    <div class="checklist-solo-lectura">
+      ${checklistResumen.map((r) => `
+        <div class="item-checklist-lectura">
+          <span>${r.textoSnapshot}</span>
+          <span class="valor-respuesta">${ETIQUETA_RESPUESTA_CHECKLIST[r.respuesta] || r.respuesta}</span>
+          ${r.observacion ? `<p class="observacion-lectura">${r.observacion}</p>` : ''}
+        </div>`).join('')}
+    </div>`;
+
+  const paradasResumen = listarParadasDeCargue(cargue.id);
+  const paradasResumenHTML = paradasResumen.length === 0
+    ? '<p class="aviso-sin-paradas">Todavía no hay paradas registradas en este cargue.</p>'
+    : paradasResumen.map((p) => `
+      <div class="fila-parada ${!p.horaFin ? 'fila-parada-abierta' : ''}" data-parada-id="${p.id}">
+        <div class="fila-parada-encabezado">
+          <span class="causa-parada">${p.causaNombreSnapshot}</span>
+          <span class="duracion-parada">${p.horaFin ? formatearDuracion(p.duracionSegundos) : 'En curso'}</span>
+        </div>
+        <div class="detalle-parada">${formatearHora(p.horaInicio)} — ${p.horaFin ? formatearHora(p.horaFin) : '…'}</div>
+        ${p.descripcionOtros ? `<p class="observacion-parada"><strong>Descripción:</strong> ${p.descripcionOtros}</p>` : ''}
+        ${p.observaciones ? `<p class="observacion-parada">${p.observaciones}</p>` : ''}
+        <div class="acciones-fila-parada">
+          <button type="button" class="boton-enlace boton-editar-parada" data-parada-id="${p.id}">Editar</button>
+          <button type="button" class="boton-enlace boton-enlace-peligro boton-eliminar-parada" data-parada-id="${p.id}">Eliminar</button>
+        </div>
+      </div>`).join('');
+
+  let resumenCargueHTML;
+  if (cargue.estado === 'APROBADO') {
+    resumenCargueHTML = '<p class="nota-fase">El cargue todavía no ha iniciado.</p>';
+  } else if (cargue.estado === 'FINALIZADO' || cargue.estado === 'CERRADO') {
+    resumenCargueHTML = `
+      <div class="fila"><span>Hora inicio</span><span>${formatearHora(cargue.horaInicioCargue)}</span></div>
+      <div class="fila"><span>Hora fin</span><span>${formatearHora(cargue.horaFinCargue)}</span></div>
+      <div class="fila"><span>Tiempo total</span><span>${formatearDuracion(cargue.tiempoTotalCargue)}</span></div>
+      <div class="fila"><span>Tiempo detenido</span><span>${formatearDuracion(cargue.tiempoDetenidoTotal)}</span></div>
+      <div class="fila"><span>Tiempo productivo</span><span>${formatearDuracion(cargue.tiempoProductivoCargue)}</span></div>
+      <div class="fila"><span>Canastillas encajables</span><span>${cargue.canastillasEncajables ?? 0}</span></div>
+      <div class="fila"><span>Canastillas grandes</span><span>${cargue.canastillasGrandes ?? 0}</span></div>
+      <div class="fila"><span>Canastillas pequeñas</span><span>${cargue.canastillasPequenas ?? 0}</span></div>`;
+  } else {
+    // EN_CARGUE o EN_PARADA: todavía en curso, solo se conoce la hora de inicio.
+    resumenCargueHTML = `<div class="fila"><span>Hora inicio</span><span>${formatearHora(cargue.horaInicioCargue)}</span></div>`;
+  }
+
+  const panelResumenHTML = `
+    <h3>Cargue</h3>
+    <div class="fila"><span>Placa</span><span>${cargue.placa}</span></div>
+    <div class="fila"><span>Conductor</span><span>${cargue.conductorNombre}</span></div>
+    <button type="button" id="boton-editar-asignacion-cargue" class="boton-enlace">✏ Corregir placa o conductor</button>
+    <div id="bloque-editar-asignacion-cargue" hidden></div>
+    ${resumenCargueHTML}
+    <h3>Paradas registradas</h3>
+    ${paradasResumenHTML}
+    ${checklistResumenHTML}`;
+
+  // ---------------------------------------------------------------------
+  // Pestaña "Cargue": solo las acciones sobre el cargue en sí (iniciarlo,
+  // finalizarlo, o corregir sus horas ya finalizado).
+  // ---------------------------------------------------------------------
+  let panelCargueHTML = '';
+  if (cargue.estado === 'APROBADO') {
+    panelCargueHTML = `
+      <div class="mensaje-confirmacion">✓ Checklist aprobado. Falta iniciar el cargue.</div>
+      <label>Hora de inicio del cargue</label>
+      ${campoFechaHoraHTML('hora-inicio-cargue', datetimeLocalDeAhora())}
+      <button type="button" id="boton-iniciar-cargue" class="boton-primario">Iniciar cargue</button>
+      <p id="mensaje-error-tab-cargue" class="mensaje-error" hidden></p>`;
+  } else if (cargue.estado === 'FINALIZADO' || cargue.estado === 'CERRADO') {
+    panelCargueHTML = `<button type="button" id="boton-editar-horas-cargue" class="boton-secundario">Corregir horas del cargue</button>`;
+  } else if (cargue.estado === 'EN_CARGUE') {
+    panelCargueHTML = `
+      <h3>Finalizar cargue</h3>
+      <label>Hora de fin del cargue</label>
+      ${campoFechaHoraHTML('hora-fin-cargue', datetimeLocalDeAhora())}
+      <label for="campo-canastillas-encajables">Canastillas encajables</label>
+      <input id="campo-canastillas-encajables" type="number" inputmode="numeric" min="0" value="0" />
+      <label for="campo-canastillas-grandes">Canastillas grandes</label>
+      <input id="campo-canastillas-grandes" type="number" inputmode="numeric" min="0" value="0" />
+      <label for="campo-canastillas-pequenas">Canastillas pequeñas</label>
+      <input id="campo-canastillas-pequenas" type="number" inputmode="numeric" min="0" value="0" />
+      <button type="button" id="boton-finalizar-cargue" class="boton-primario">Finalizar cargue</button>
+      <p id="mensaje-error-tab-cargue" class="mensaje-error" hidden></p>`;
+  } else if (cargue.estado === 'EN_PARADA') {
+    const paradaAbierta = obtenerParadaAbierta(cargue.id);
+    panelCargueHTML = `
+      <div class="mensaje-confirmacion">⏸ En parada desde las ${formatearHora(paradaAbierta?.horaInicio)} — causa: ${paradaAbierta?.causaNombreSnapshot || '—'}</div>
+      <p class="nota-fase">Ve a la pestaña "Paradas" para finalizar o cancelar esta parada. El cargue no se puede finalizar mientras esté en pausa.</p>`;
+  }
+
+  // ---------------------------------------------------------------------
+  // Pestaña "Paradas": solo las acciones sobre las paradas (registrar una
+  // nueva, o finalizar/cancelar la que esté abierta).
+  // ---------------------------------------------------------------------
+  let panelParadasHTML = '';
+  if (cargue.estado === 'EN_CARGUE') {
+    panelParadasHTML = `
+      <h3>Registrar parada</h3>
+      <label for="campo-causa-parada">Causa</label>
+      <select id="campo-causa-parada">${opcionesCausasAgrupadas(listarCausasParadaConDetalle())}</select>
+      <div id="bloque-descripcion-otros" hidden>
+        <label for="campo-descripcion-otros">Descripción</label>
+        <textarea id="campo-descripcion-otros"></textarea>
+      </div>
+      <label>Hora de inicio de la parada</label>
+      ${campoFechaHoraHTML('hora-inicio-parada', datetimeLocalDeAhora())}
+      <label for="campo-observaciones-parada">Observación (opcional)</label>
+      <textarea id="campo-observaciones-parada"></textarea>
+      <button type="button" id="boton-registrar-parada" class="boton-secundario">Registrar parada</button>
+      <p id="mensaje-error-paradas" class="mensaje-error" hidden></p>`;
+  } else if (cargue.estado === 'EN_PARADA') {
+    const paradaAbierta = obtenerParadaAbierta(cargue.id);
+    panelParadasHTML = `
+      <div class="mensaje-confirmacion">⏸ En parada desde las ${formatearHora(paradaAbierta?.horaInicio)} — causa: ${paradaAbierta?.causaNombreSnapshot || '—'}</div>
+      <label>Hora de fin de la parada</label>
+      ${campoFechaHoraHTML('hora-fin-parada', datetimeLocalDeAhora())}
+      <button type="button" id="boton-finalizar-parada" class="boton-primario">Finalizar parada</button>
+      <button type="button" id="boton-cancelar-parada" class="boton-enlace boton-enlace-peligro">Esta parada no debió registrarse — cancelarla</button>
+      <p id="mensaje-error-paradas" class="mensaje-error" hidden></p>`;
+  } else {
+    panelParadasHTML = '<p class="nota-fase">Aquí vas a poder registrar una parada nueva mientras el cargue esté en curso.</p>';
+  }
+
+  contenedor.innerHTML = `
+    <div class="tabs-tiempos">
+      <button type="button" class="tab-tiempos ${vistaTiempos === 'cargue' ? 'activa' : ''}" data-tab="cargue">Cargue</button>
+      <button type="button" class="tab-tiempos ${vistaTiempos === 'paradas' ? 'activa' : ''}" data-tab="paradas">Paradas</button>
+      <button type="button" class="tab-tiempos ${vistaTiempos === 'resumen' ? 'activa' : ''}" data-tab="resumen">Resumen</button>
+    </div>
+    <div class="seccion-tiempos" id="panel-tiempos-cargue" ${vistaTiempos !== 'cargue' ? 'hidden' : ''}>${panelCargueHTML}</div>
+    <div class="seccion-tiempos" id="panel-tiempos-paradas" ${vistaTiempos !== 'paradas' ? 'hidden' : ''}>${panelParadasHTML}</div>
+    <div class="seccion-tiempos" id="panel-tiempos-resumen" ${vistaTiempos !== 'resumen' ? 'hidden' : ''}>${panelResumenHTML}</div>`;
+
+  contenedor.querySelectorAll('.tab-tiempos').forEach((boton) => {
+    boton.addEventListener('click', () => {
+      vistaTiempos = boton.dataset.tab;
+      pintarSeccionTiempos(cargue);
+    });
+  });
+
+  wireBotonesAhoraFechaHora(contenedor);
+  wireAccionesTiempos(cargue);
+}
+
+function wireAccionesTiempos(cargue) {
+  const contenedor = el('seccion-tiempos');
+
+  const botonEditarAsignacion = el('boton-editar-asignacion-cargue');
+  if (botonEditarAsignacion) {
+    botonEditarAsignacion.addEventListener('click', () => {
+      const bloque = el('bloque-editar-asignacion-cargue');
+      bloque.hidden = !bloque.hidden;
+      if (bloque.hidden) return;
+      const vehiculos = [...ESTADO.vehiculos].sort((a, b) => a.placa.localeCompare(b.placa));
+      const conductores = [...ESTADO.conductores].sort((a, b) => a.nombreCompleto.localeCompare(b.nombreCompleto));
+      bloque.innerHTML = `
+        <label for="campo-corregir-vehiculo">Vehículo (placa)</label>
+        <select id="campo-corregir-vehiculo">
+          ${vehiculos.map((v) => `<option value="${v.id}" ${v.id === cargue.vehiculoId ? 'selected' : ''}>${v.placa}</option>`).join('')}
+        </select>
+        <label for="campo-corregir-conductor">Conductor</label>
+        <select id="campo-corregir-conductor">
+          ${conductores.map((c) => `<option value="${c.id}" ${c.id === cargue.conductorId ? 'selected' : ''}>${c.nombreCompleto}</option>`).join('')}
+        </select>
+        <button type="button" id="boton-guardar-asignacion" class="boton-secundario">Guardar cambios</button>
+        <p id="mensaje-error-asignacion" class="mensaje-error" hidden></p>`;
+      el('boton-guardar-asignacion').addEventListener('click', async () => {
+        const mensajeError = el('mensaje-error-asignacion');
+        mensajeError.hidden = true;
+        try {
+          await editarAsignacionCargue(cargue.id, {
+            vehiculoId: el('campo-corregir-vehiculo').value,
+            conductorId: el('campo-corregir-conductor').value,
+          });
+          await pintarDetalleCargue(cargue.id);
+        } catch (error) {
+          mensajeError.textContent = error.message || 'No se pudo guardar el cambio.';
+          mensajeError.hidden = false;
+        }
+      });
+    });
+  }
+
+  const botonIniciarCargue = el('boton-iniciar-cargue');
+  if (botonIniciarCargue) {
+    botonIniciarCargue.addEventListener('click', async () => {
+      const mensajeError = el('mensaje-error-tab-cargue');
+      mensajeError.hidden = true;
+      botonIniciarCargue.disabled = true;
+      try {
+        await iniciarCargue(cargue.id, leerFechaHora('hora-inicio-cargue'));
+        await pintarDetalleCargue(cargue.id);
+      } catch (error) {
+        mensajeError.textContent = error.message || 'No se pudo iniciar el cargue.';
+        mensajeError.hidden = false;
+      } finally {
+        botonIniciarCargue.disabled = false;
+      }
+    });
+  }
+
+  const selectCausa = el('campo-causa-parada');
+  if (selectCausa) {
+    const causas = listarCausasParadaConDetalle();
+    selectCausa.addEventListener('change', () => {
+      const causa = causas.find((c) => String(c.id) === selectCausa.value);
+      el('bloque-descripcion-otros').hidden = !(causa && causa.requiereDescripcion);
+    });
+  }
+
+  const botonRegistrarParada = el('boton-registrar-parada');
+  if (botonRegistrarParada) {
+    botonRegistrarParada.addEventListener('click', async () => {
+      const mensajeError = el('mensaje-error-paradas');
+      mensajeError.hidden = true;
+      botonRegistrarParada.disabled = true;
+      try {
+        await registrarParada(cargue.id, {
+          causaId: el('campo-causa-parada').value,
+          horaInicioLocalStr: leerFechaHora('hora-inicio-parada'),
+          observaciones: el('campo-observaciones-parada').value,
+          descripcionOtros: el('campo-descripcion-otros') ? el('campo-descripcion-otros').value : '',
+        });
+        await pintarDetalleCargue(cargue.id);
+      } catch (error) {
+        mensajeError.textContent = error.message || 'No se pudo registrar la parada.';
+        mensajeError.hidden = false;
+      } finally {
+        botonRegistrarParada.disabled = false;
+      }
+    });
+  }
+
+  const botonFinalizarParada = el('boton-finalizar-parada');
+  if (botonFinalizarParada) {
+    botonFinalizarParada.addEventListener('click', async () => {
+      const mensajeError = el('mensaje-error-paradas');
+      mensajeError.hidden = true;
+      botonFinalizarParada.disabled = true;
+      try {
+        await finalizarParada(obtenerParadaAbierta(cargue.id).id, leerFechaHora('hora-fin-parada'));
+        await pintarDetalleCargue(cargue.id);
+      } catch (error) {
+        mensajeError.textContent = error.message || 'No se pudo finalizar la parada.';
+        mensajeError.hidden = false;
+      } finally {
+        botonFinalizarParada.disabled = false;
+      }
+    });
+  }
+
+  const botonCancelarParada = el('boton-cancelar-parada');
+  if (botonCancelarParada) {
+    botonCancelarParada.addEventListener('click', async () => {
+      if (!window.confirm('¿Cancelar esta parada? Se borrará por completo, como si nunca se hubiera registrado.')) return;
+      try {
+        await eliminarParada(obtenerParadaAbierta(cargue.id).id);
+        await pintarDetalleCargue(cargue.id);
+      } catch (error) {
+        window.alert(error.message || 'No se pudo cancelar la parada.');
+      }
+    });
+  }
+
+  const botonFinalizarCargue = el('boton-finalizar-cargue');
+  if (botonFinalizarCargue) {
+    botonFinalizarCargue.addEventListener('click', async () => {
+      const mensajeError = el('mensaje-error-tab-cargue');
+      mensajeError.hidden = true;
+      botonFinalizarCargue.disabled = true;
+      try {
+        await finalizarCargue(cargue.id, leerFechaHora('hora-fin-cargue'), {
+          encajables: el('campo-canastillas-encajables').value,
+          grandes: el('campo-canastillas-grandes').value,
+          pequenas: el('campo-canastillas-pequenas').value,
+        });
+        await pintarDetalleCargue(cargue.id);
+      } catch (error) {
+        mensajeError.textContent = error.message || 'No se pudo finalizar el cargue.';
+        mensajeError.hidden = false;
+      } finally {
+        botonFinalizarCargue.disabled = false;
+      }
+    });
+  }
+
+  const botonEditarHoras = el('boton-editar-horas-cargue');
+  if (botonEditarHoras) {
+    botonEditarHoras.addEventListener('click', () => mostrarFormularioEdicionHorasCargue(cargue));
+  }
+
+  contenedor.querySelectorAll('.boton-editar-parada').forEach((boton) => {
+    boton.addEventListener('click', () => mostrarFormularioEdicionParada(boton.dataset.paradaId, cargue.id));
+  });
+  contenedor.querySelectorAll('.boton-eliminar-parada').forEach((boton) => {
+    boton.addEventListener('click', async () => {
+      if (!window.confirm('¿Eliminar esta parada? Esta acción no se puede deshacer.')) return;
+      try {
+        await eliminarParada(boton.dataset.paradaId);
+        await pintarDetalleCargue(cargue.id);
+      } catch (error) {
+        window.alert(error.message || 'No se pudo eliminar la parada.');
+      }
+    });
+  });
+}
+
+function mostrarFormularioEdicionHorasCargue(cargue) {
+  const contenedor = el('panel-tiempos-cargue');
+  contenedor.innerHTML = `
+    <h3>Corregir horas del cargue</h3>
+    <label>Hora de inicio</label>
+    ${campoFechaHoraHTML('editar-cargue-inicio', datetimeLocalDeISO(cargue.horaInicioCargue))}
+    <label>Hora de fin</label>
+    ${campoFechaHoraHTML('editar-cargue-fin', datetimeLocalDeISO(cargue.horaFinCargue))}
+    <button type="button" class="boton-secundario" id="boton-guardar-horas-cargue">Guardar cambios</button>
+    <button type="button" class="boton-enlace" id="boton-cancelar-edicion-horas">Cancelar</button>
+    <p id="mensaje-error-editar-horas" class="mensaje-error" hidden></p>`;
+  wireBotonesAhoraFechaHora(contenedor);
+  el('boton-cancelar-edicion-horas').addEventListener('click', () => pintarDetalleCargue(cargue.id));
+  el('boton-guardar-horas-cargue').addEventListener('click', async () => {
+    const mensajeError = el('mensaje-error-editar-horas');
+    mensajeError.hidden = true;
+    try {
+      await editarHorasCargue(cargue.id, {
+        horaInicioLocalStr: leerFechaHora('editar-cargue-inicio'),
+        horaFinLocalStr: leerFechaHora('editar-cargue-fin'),
+      });
+      await pintarDetalleCargue(cargue.id);
+    } catch (error) {
+      mensajeError.textContent = error.message || 'No se pudo guardar el cambio.';
+      mensajeError.hidden = false;
+    }
+  });
+}
+
+async function mostrarFormularioEdicionParada(paradaId, cargueId) {
+  const parada = ESTADO.paradas.find((p) => p.id === paradaId);
+  const causas = listarCausasParadaConDetalle();
+  const fila = document.querySelector(`.fila-parada[data-parada-id="${paradaId}"]`);
+  if (!parada || !fila) return;
+
+  fila.innerHTML = `
+    <h3>Editar parada</h3>
+    <label for="editar-causa-${paradaId}">Causa</label>
+    <select id="editar-causa-${paradaId}">${opcionesCausasAgrupadas(causas, parada.causaId)}</select>
+    <label for="editar-desc-${paradaId}">Descripción</label>
+    <textarea id="editar-desc-${paradaId}">${parada.descripcionOtros || ''}</textarea>
+    <label>Hora de inicio</label>
+    ${campoFechaHoraHTML(`editar-inicio-${paradaId}`, datetimeLocalDeISO(parada.horaInicio))}
+    ${parada.horaFin ? `<label>Hora de fin</label>${campoFechaHoraHTML(`editar-fin-${paradaId}`, datetimeLocalDeISO(parada.horaFin))}` : ''}
+    <label for="editar-obs-${paradaId}">Observación</label>
+    <textarea id="editar-obs-${paradaId}">${parada.observaciones || ''}</textarea>
+    <div class="acciones-fila-parada">
+      <button type="button" class="boton-secundario" id="editar-guardar-${paradaId}">Guardar cambios</button>
+      <button type="button" class="boton-enlace" id="editar-cancelar-${paradaId}">Cancelar</button>
+    </div>
+    <p id="editar-error-${paradaId}" class="mensaje-error" hidden></p>`;
+
+  wireBotonesAhoraFechaHora(fila);
+  el(`editar-cancelar-${paradaId}`).addEventListener('click', () => pintarDetalleCargue(cargueId));
+  el(`editar-guardar-${paradaId}`).addEventListener('click', async () => {
+    const mensajeError = el(`editar-error-${paradaId}`);
+    mensajeError.hidden = true;
+    try {
+      await editarParada(paradaId, {
+        causaId: el(`editar-causa-${paradaId}`).value,
+        horaInicioLocalStr: leerFechaHora(`editar-inicio-${paradaId}`),
+        horaFinLocalStr: parada.horaFin ? leerFechaHora(`editar-fin-${paradaId}`) : '',
+        observaciones: el(`editar-obs-${paradaId}`).value,
+        descripcionOtros: el(`editar-desc-${paradaId}`).value,
+      });
+      await pintarDetalleCargue(cargueId);
+    } catch (error) {
+      mensajeError.textContent = error.message || 'No se pudo guardar el cambio.';
+      mensajeError.hidden = false;
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// PANTALLA: DESCARGUE DE CANASTAS
+// ---------------------------------------------------------------------------
+
+function poblarSelectClientesDescargue() {
+  const clientes = [...ESTADO.clientes].filter((c) => c.estado !== 'INACTIVO').sort((a, b) => a.nombre.localeCompare(b.nombre));
+  el('campo-descargue-cliente').innerHTML =
+    '<option value="" disabled selected>Selecciona el cliente</option>' +
+    opcionesClientesAgrupadas(clientes);
+}
+function poblarSelectDestinosDescargue(clienteId) {
+  const select = el('campo-descargue-destino');
+  const manual = el('campo-descargue-destino-manual');
+  if (esClienteMayorista(clienteId)) {
+    select.hidden = true;
+    select.disabled = true;
+    select.required = false;
+    select.innerHTML = '<option value="" disabled selected>—</option>';
+    manual.hidden = false;
+    manual.required = true;
+    manual.value = '';
+    return;
+  }
+  select.hidden = false;
+  manual.hidden = true;
+  manual.required = false;
+  manual.value = '';
+  if (!clienteId) {
+    select.innerHTML = '<option value="" disabled selected>Primero elige el cliente</option>';
+    select.disabled = true;
+    select.required = true;
+    return;
+  }
+  const destinos = ESTADO.destinos.filter((d) => d.clienteId === clienteId && d.estado !== 'INACTIVO');
+  select.innerHTML =
+    '<option value="" disabled selected>Selecciona un destino</option>' +
+    destinos.map((d) => `<option value="${d.id}">${d.ciudad}</option>`).join('');
+  select.disabled = false;
+  select.required = true;
+}
+function poblarSelectVehiculosDescargue(idSeleccionado) {
+  const vehiculos = [...ESTADO.vehiculos].sort((a, b) => a.placa.localeCompare(b.placa));
+  el('campo-descargue-vehiculo').innerHTML =
+    '<option value="" disabled selected>Selecciona un vehículo</option>' +
+    vehiculos.map((v) => `<option value="${v.id}">${v.placa}</option>`).join('') +
+    '<option value="__nuevo__">➕ Agregar vehículo nuevo…</option>';
+  if (idSeleccionado) el('campo-descargue-vehiculo').value = idSeleccionado;
+}
+function poblarSelectConductoresDescargue(idSeleccionado) {
+  const conductores = [...ESTADO.conductores].sort((a, b) => a.nombreCompleto.localeCompare(b.nombreCompleto));
+  el('campo-descargue-conductor').innerHTML =
+    '<option value="" disabled selected>Selecciona un conductor</option>' +
+    conductores.map((c) => `<option value="${c.id}">${c.nombreCompleto}</option>`).join('') +
+    '<option value="__nuevo__">➕ Agregar conductor nuevo…</option>';
+  if (idSeleccionado) el('campo-descargue-conductor').value = idSeleccionado;
+}
+
+async function abrirPantallaNuevoDescargue() {
+  el('form-nuevo-descargue').reset();
+  el('mensaje-error-descargue').hidden = true;
+  el('confirmacion-descargue').hidden = true;
+  el('form-nuevo-descargue').hidden = false;
+  el('bloque-descargue-nuevo-vehiculo').hidden = true;
+  el('bloque-descargue-nuevo-conductor').hidden = true;
+  el('campo-descargue-fecha').value = fechaLocalHoyISO();
+  await cargarEstadoCompletoSeguro();
+  poblarSelectClientesDescargue();
+  poblarSelectDestinosDescargue('');
+  poblarSelectVehiculosDescargue();
+  poblarSelectConductoresDescargue();
+  el('campo-descargue-inicio-contenedor').innerHTML = campoFechaHoraHTML('descargue-inicio', datetimeLocalDeAhora());
+  el('campo-descargue-fin-contenedor').innerHTML = campoFechaHoraHTML('descargue-fin', datetimeLocalDeAhora());
+  wireBotonesAhoraFechaHora(el('pantalla-nuevo-descargue'));
+  mostrarPantalla('pantalla-nuevo-descargue');
+}
+
+async function manejarEnvioNuevoDescargue(evento) {
+  evento.preventDefault();
+  const mensajeError = el('mensaje-error-descargue');
+  mensajeError.hidden = true;
+  const boton = evento.target.querySelector('button[type="submit"]');
+  boton.disabled = true;
+  try {
+    const clienteIdDescargue = el('campo-descargue-cliente').value;
+    await crearDescargue({
+      fecha: el('campo-descargue-fecha').value,
+      remision: el('campo-descargue-remision').value,
+      clienteId: clienteIdDescargue,
+      destinoId: esClienteMayorista(clienteIdDescargue) ? '' : el('campo-descargue-destino').value,
+      destinoManual: esClienteMayorista(clienteIdDescargue) ? el('campo-descargue-destino-manual').value : '',
+      vehiculoId: el('campo-descargue-vehiculo').value,
+      conductorId: el('campo-descargue-conductor').value,
+      horaInicioLocalStr: leerFechaHora('descargue-inicio'),
+      horaFinLocalStr: leerFechaHora('descargue-fin'),
+      canastillasEncajables: el('campo-descargue-encajables').value,
+      canastillasGrandes: el('campo-descargue-grandes').value,
+      canastillasPequenas: el('campo-descargue-pequenas').value,
+    });
+    el('form-nuevo-descargue').hidden = true;
+    el('confirmacion-descargue').hidden = false;
+  } catch (error) {
+    mensajeError.textContent = error.message || 'No se pudo guardar el descargue.';
+    mensajeError.hidden = false;
+  } finally {
+    boton.disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PANTALLA: GESTIÓN DE CAUSAS
+// ---------------------------------------------------------------------------
+
+function opcionesSelectSimple(items) {
+  return items.map((i) => `<option value="${i.id}">${i.nombre}</option>`).join('');
+}
+
+async function abrirPantallaGestionCausas() {
+  mostrarPantalla('pantalla-gestion-causas');
+  await cargarEstadoCompletoSeguro();
+  await poblarFormularioNuevaCausa();
+  renderizarListaCausas();
+}
+
+function renderizarFilaCausa(causa) {
+  return `
+    <div class="formulario-parada" data-causa-id="${causa.id}">
+      <label for="editar-causa-nombre-${causa.id}">Nombre</label>
+      <input id="editar-causa-nombre-${causa.id}" type="text" value="${causa.nombre}" />
+      <label for="editar-causa-categoria-${causa.id}">Categoría</label>
+      <select id="editar-causa-categoria-${causa.id}"></select>
+      <label for="editar-causa-responsable-${causa.id}">Responsable</label>
+      <select id="editar-causa-responsable-${causa.id}"></select>
+      <label for="editar-causa-tipo-${causa.id}">Tipo de tiempo</label>
+      <select id="editar-causa-tipo-${causa.id}"></select>
+      <label class="etiqueta-checkbox"><input type="checkbox" id="editar-causa-requiere-desc-${causa.id}" ${causa.requiereDescripcion ? 'checked' : ''} /> Exige descripción obligatoria</label>
+      <label class="etiqueta-checkbox"><input type="checkbox" id="editar-causa-activo-${causa.id}" ${causa.activo ? 'checked' : ''} /> Activa (visible al registrar paradas)</label>
+      <button type="button" class="boton-secundario" id="editar-causa-guardar-${causa.id}">Guardar cambios</button>
+      <p id="editar-causa-error-${causa.id}" class="mensaje-error" hidden></p>
+    </div>`;
+}
+
+function renderizarListaCausas() {
+  const causas = listarTodasLasCausasConDetalle();
+  el('lista-causas').innerHTML = causas.map(renderizarFilaCausa).join('');
+
+  const categorias = listarCategoriasParadaTodas();
+  const responsables = listarResponsablesTodos();
+  const tiposTiempo = listarTiposTiempoTodos();
+
+  causas.forEach((causa) => {
+    el(`editar-causa-categoria-${causa.id}`).innerHTML = opcionesSelectSimple(categorias);
+    el(`editar-causa-categoria-${causa.id}`).value = causa.categoriaId;
+    el(`editar-causa-responsable-${causa.id}`).innerHTML = opcionesSelectSimple(responsables);
+    el(`editar-causa-responsable-${causa.id}`).value = causa.responsableId;
+    el(`editar-causa-tipo-${causa.id}`).innerHTML = tiposTiempo.map((t) => `<option value="${t.id}">${ETIQUETA_TIPO_TIEMPO[t.nombre] || t.nombre}</option>`).join('');
+    el(`editar-causa-tipo-${causa.id}`).value = causa.tipoTiempoId;
+
+    el(`editar-causa-guardar-${causa.id}`).addEventListener('click', async () => {
+      const mensajeError = el(`editar-causa-error-${causa.id}`);
+      mensajeError.hidden = true;
+      try {
+        await editarCausa(causa.id, {
+          nombre: el(`editar-causa-nombre-${causa.id}`).value,
+          categoriaId: el(`editar-causa-categoria-${causa.id}`).value,
+          responsableId: el(`editar-causa-responsable-${causa.id}`).value,
+          tipoTiempoId: el(`editar-causa-tipo-${causa.id}`).value,
+          requiereDescripcion: el(`editar-causa-requiere-desc-${causa.id}`).checked,
+          activo: el(`editar-causa-activo-${causa.id}`).checked,
+        });
+        await renderizarListaCausas();
+      } catch (error) {
+        mensajeError.textContent = error.message || 'No se pudo guardar el cambio.';
+        mensajeError.hidden = false;
+      }
+    });
+  });
+}
+
+async function poblarFormularioNuevaCausa() {
+  const categorias = listarCategoriasParadaTodas();
+  const responsables = listarResponsablesTodos();
+  const tiposTiempo = listarTiposTiempoTodos();
+  el('campo-nueva-causa-categoria').innerHTML = opcionesSelectSimple(categorias);
+  el('campo-nueva-causa-responsable').innerHTML = opcionesSelectSimple(responsables);
+  el('campo-nueva-causa-tipo').innerHTML = tiposTiempo.map((t) => `<option value="${t.id}">${ETIQUETA_TIPO_TIEMPO[t.nombre] || t.nombre}</option>`).join('');
+}
+
+// ---------------------------------------------------------------------------
+// PANTALLA: VEHÍCULOS, CONDUCTORES Y CLIENTES (mayoristas incluidos) — para
+// poder corregir una placa o un nombre mal ingresados, y para sumar clientes
+// nuevos (mayoristas) sin tener que tocar la hoja de cálculo a mano.
+// ---------------------------------------------------------------------------
+
+async function editarVehiculo(vehiculoId, datos) {
+  const respuesta = await apiPost('editarVehiculo', { vehiculoId, ...datos });
+  _aplicarEnEstado('vehiculos', respuesta.vehiculo);
+}
+async function editarConductor(conductorId, datos) {
+  const respuesta = await apiPost('editarConductor', { conductorId, ...datos });
+  _aplicarEnEstado('conductores', respuesta.conductor);
+}
+async function agregarCliente(datos) {
+  const respuesta = await apiPost('agregarCliente', datos);
+  _aplicarEnEstado('clientes', respuesta.cliente);
+}
+async function editarCliente(clienteId, datos) {
+  const respuesta = await apiPost('editarCliente', { clienteId, ...datos });
+  _aplicarEnEstado('clientes', respuesta.cliente);
+}
+
+async function abrirPantallaGestionCatalogos() {
+  mostrarPantalla('pantalla-gestion-catalogos');
+  await cargarEstadoCompletoSeguro();
+  renderizarListaVehiculosCatalogo();
+  renderizarListaConductoresCatalogo();
+  renderizarListaClientesCatalogo();
+}
+
+function renderizarListaVehiculosCatalogo() {
+  const vehiculos = [...ESTADO.vehiculos].sort((a, b) => a.placa.localeCompare(b.placa));
+  el('lista-vehiculos').innerHTML = vehiculos.map((v) => `
+    <div class="formulario-parada" data-vehiculo-id="${v.id}">
+      <label for="editar-vehiculo-placa-${v.id}">Placa</label>
+      <input id="editar-vehiculo-placa-${v.id}" type="text" value="${v.placa}" autocapitalize="characters" />
+      <label class="etiqueta-checkbox">
+        <input type="checkbox" id="editar-vehiculo-activo-${v.id}" ${v.estado !== 'INACTIVO' ? 'checked' : ''} /> Activo (visible al crear cargues/descargues)
+      </label>
+      <button type="button" class="boton-secundario" id="editar-vehiculo-guardar-${v.id}">Guardar cambios</button>
+      <p id="editar-vehiculo-error-${v.id}" class="mensaje-error" hidden></p>
+    </div>`).join('');
+
+  vehiculos.forEach((v) => {
+    el(`editar-vehiculo-guardar-${v.id}`).addEventListener('click', async () => {
+      const mensajeError = el(`editar-vehiculo-error-${v.id}`);
+      mensajeError.hidden = true;
+      try {
+        await editarVehiculo(v.id, {
+          placa: el(`editar-vehiculo-placa-${v.id}`).value,
+          estado: el(`editar-vehiculo-activo-${v.id}`).checked ? 'ACTIVO' : 'INACTIVO',
+        });
+        renderizarListaVehiculosCatalogo();
+      } catch (error) {
+        mensajeError.textContent = error.message || 'No se pudo guardar el cambio.';
+        mensajeError.hidden = false;
+      }
+    });
+  });
+}
+
+function renderizarListaConductoresCatalogo() {
+  const conductores = [...ESTADO.conductores].sort((a, b) => a.nombreCompleto.localeCompare(b.nombreCompleto));
+  el('lista-conductores').innerHTML = conductores.map((c) => `
+    <div class="formulario-parada" data-conductor-id="${c.id}">
+      <label for="editar-conductor-nombre-${c.id}">Nombre completo</label>
+      <input id="editar-conductor-nombre-${c.id}" type="text" value="${c.nombreCompleto}" />
+      <label class="etiqueta-checkbox">
+        <input type="checkbox" id="editar-conductor-activo-${c.id}" ${c.estado !== 'INACTIVO' ? 'checked' : ''} /> Activo (visible al crear cargues/descargues)
+      </label>
+      <button type="button" class="boton-secundario" id="editar-conductor-guardar-${c.id}">Guardar cambios</button>
+      <p id="editar-conductor-error-${c.id}" class="mensaje-error" hidden></p>
+    </div>`).join('');
+
+  conductores.forEach((c) => {
+    el(`editar-conductor-guardar-${c.id}`).addEventListener('click', async () => {
+      const mensajeError = el(`editar-conductor-error-${c.id}`);
+      mensajeError.hidden = true;
+      try {
+        await editarConductor(c.id, {
+          nombreCompleto: el(`editar-conductor-nombre-${c.id}`).value,
+          estado: el(`editar-conductor-activo-${c.id}`).checked ? 'ACTIVO' : 'INACTIVO',
+        });
+        renderizarListaConductoresCatalogo();
+      } catch (error) {
+        mensajeError.textContent = error.message || 'No se pudo guardar el cambio.';
+        mensajeError.hidden = false;
+      }
+    });
+  });
+}
+
+function renderizarListaClientesCatalogo() {
+  const clientes = [...ESTADO.clientes].sort((a, b) =>
+    (a.categoria || '').localeCompare(b.categoria || '') || a.nombre.localeCompare(b.nombre));
+  el('lista-clientes').innerHTML = clientes.map((c) => `
+    <div class="formulario-parada" data-cliente-id="${c.id}">
+      <label for="editar-cliente-nombre-${c.id}">Nombre</label>
+      <input id="editar-cliente-nombre-${c.id}" type="text" value="${c.nombre}" />
+      <label for="editar-cliente-categoria-${c.id}">Tipo</label>
+      <select id="editar-cliente-categoria-${c.id}">
+        <option value="ESTANDAR">Cliente (destinos de una lista fija)</option>
+        <option value="MAYORISTA">Mayorista (el destino se escribe a mano)</option>
+      </select>
+      <label class="etiqueta-checkbox">
+        <input type="checkbox" id="editar-cliente-activo-${c.id}" ${c.estado !== 'INACTIVO' ? 'checked' : ''} /> Activo (visible al crear cargues/descargues)
+      </label>
+      <button type="button" class="boton-secundario" id="editar-cliente-guardar-${c.id}">Guardar cambios</button>
+      <p id="editar-cliente-error-${c.id}" class="mensaje-error" hidden></p>
+    </div>`).join('');
+
+  clientes.forEach((c) => {
+    el(`editar-cliente-categoria-${c.id}`).value = c.categoria === 'MAYORISTA' ? 'MAYORISTA' : 'ESTANDAR';
+    el(`editar-cliente-guardar-${c.id}`).addEventListener('click', async () => {
+      const mensajeError = el(`editar-cliente-error-${c.id}`);
+      mensajeError.hidden = true;
+      try {
+        await editarCliente(c.id, {
+          nombre: el(`editar-cliente-nombre-${c.id}`).value,
+          categoria: el(`editar-cliente-categoria-${c.id}`).value,
+          estado: el(`editar-cliente-activo-${c.id}`).checked ? 'ACTIVO' : 'INACTIVO',
+        });
+        renderizarListaClientesCatalogo();
+      } catch (error) {
+        mensajeError.textContent = error.message || 'No se pudo guardar el cambio.';
+        mensajeError.hidden = false;
+      }
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// PANTALLA: HISTORIAL
+// ---------------------------------------------------------------------------
+
+function renderizarFilaDescargueHistorial(d) {
+  return `
+    <li>
+      <div class="tarjeta-cargue">
+        <div class="fila-superior">
+          <span class="placa">${d.placa}</span>
+          <span class="etiqueta-estado finalizado">${formatearDuracion(d.duracionSegundos)}</span>
+        </div>
+        <div class="cliente-destino">${d.clienteNombre} — ${d.destinoCiudad} · ${d.fecha}${d.remision ? ' · ' + d.remision : ''}</div>
+      </div>
+    </li>`;
+}
+
+function renderizarListaHistorial() {
+  const lista = el('lista-historial');
+  const avisoVacio = el('historial-vacio');
+  const finalizados = listarCarguesFinalizadosConDetalle();
+  if (finalizados.length === 0) { lista.innerHTML = ''; avisoVacio.hidden = false; }
+  else { avisoVacio.hidden = true; lista.innerHTML = finalizados.map(renderizarFilaCargue).join(''); wireTarjetasCargue(lista, 'historial'); }
+
+  const listaDescargues = el('lista-descargues-historial');
+  const avisoVacioDescargues = el('descargues-vacio');
+  const descargues = listarDescarguesConDetalle();
+  if (descargues.length === 0) { listaDescargues.innerHTML = ''; avisoVacioDescargues.hidden = false; }
+  else { avisoVacioDescargues.hidden = true; listaDescargues.innerHTML = descargues.map(renderizarFilaDescargueHistorial).join(''); }
+}
+
+async function abrirPantallaHistorial() {
+  mostrarPantalla('pantalla-historial');
+  await cargarEstadoCompletoSeguro();
+  renderizarListaHistorial();
+}
+
+// ---------------------------------------------------------------------------
+// PANTALLA: TABLERO OPERATIVO
+// ---------------------------------------------------------------------------
+
+function renderizarKPIs(indicadores) {
+  return `
+    <div class="fila-kpis">
+      <div class="tarjeta-kpi"><span class="valor-kpi">${indicadores.cantidadCargues}</span><span class="etiqueta-kpi">Cargues finalizados</span></div>
+      <div class="tarjeta-kpi"><span class="valor-kpi">${indicadores.promedioPorcentajeProductivo}%</span><span class="etiqueta-kpi">Tiempo productivo prom.</span></div>
+      <div class="tarjeta-kpi"><span class="valor-kpi">${formatearDuracion(indicadores.promedioTiempoTotal)}</span><span class="etiqueta-kpi">Duración promedio</span></div>
+      <div class="tarjeta-kpi"><span class="valor-kpi">${formatearDuracion(indicadores.promedioTiempoDetenido)}</span><span class="etiqueta-kpi">Tiempo detenido prom.</span></div>
+    </div>`;
+}
+
+function renderizarRanking(ranking) {
+  if (ranking.length === 0) return '<p class="aviso-vacio-inline">Sin paradas registradas en este periodo.</p>';
+  const maximo = Math.max(...ranking.map((r) => r.duracionTotal));
+  return `<h3>Principales causas de tiempo detenido</h3>` + ranking.map((r) => `
+    <div class="fila-ranking">
+      <div class="fila-ranking-encabezado">
+        <span class="causa-ranking">${r.causa}</span>
+        <span class="valor-ranking">${formatearDuracion(r.duracionTotal)} · ${r.cantidad} vez(es)</span>
+      </div>
+      <div class="barra-fondo"><div class="barra-relleno" style="width:${Math.round((r.duracionTotal / maximo) * 100)}%"></div></div>
+    </div>`).join('');
+}
+
+function renderizarGraficaDias(serie) {
+  if (serie.length === 0) return '';
+  const maximo = Math.max(1, ...serie.map((d) => d.cantidad));
+  return `<h3>Cargues finalizados por día</h3><div class="grafica-barras-dias">${serie.map((d) => `
+    <div class="barra-dia">
+      <span class="barra-dia-valor">${d.cantidad || ''}</span>
+      <div class="barra-dia-columna"><div class="barra-dia-relleno" style="height:${Math.round((d.cantidad / maximo) * 100)}%"></div></div>
+      <span class="barra-dia-etiqueta">${d.fecha.slice(5)}</span>
+    </div>`).join('')}</div>`;
+}
+
+function renderizarComparativoVehiculo(comparativo) {
+  if (comparativo.length === 0) return '';
+  const maximo = Math.max(...comparativo.map((v) => v.cantidad));
+  return `<h3>Por vehículo</h3>` + comparativo.map((v) => `
+    <div class="fila-ranking">
+      <div class="fila-ranking-encabezado"><span class="causa-ranking">${v.placa}</span><span class="valor-ranking">${v.cantidad} cargue(s) · ${formatearDuracion(v.tiempoTotalPromedio)} prom.</span></div>
+      <div class="barra-fondo"><div class="barra-relleno" style="width:${Math.round((v.cantidad / maximo) * 100)}%"></div></div>
+    </div>`).join('');
+}
+
+function renderizarComparativoCliente(comparativo) {
+  if (comparativo.length === 0) return '';
+  const maximo = Math.max(...comparativo.map((c) => c.cantidad));
+  return `<h3>Por cliente</h3>` + comparativo.map((c) => `
+    <div class="fila-ranking">
+      <div class="fila-ranking-encabezado"><span class="causa-ranking">${c.clienteNombre}</span><span class="valor-ranking">${c.cantidad} cargue(s) · ${formatearDuracion(c.tiempoTotalPromedio)} prom.</span></div>
+      <div class="barra-fondo"><div class="barra-relleno" style="width:${Math.round((c.cantidad / maximo) * 100)}%"></div></div>
+    </div>`).join('');
+}
+
+function renderizarIndicadores(filtro) {
+  const indicadores = calcularIndicadores(filtro);
+  const indicadoresDescargue = calcularIndicadoresDescargue(filtro);
+  const serie = calcularSerieDiariaCargues(filtro);
+  const porVehiculo = calcularComparativoPorVehiculo(filtro);
+  const porCliente = calcularComparativoPorCliente(filtro);
+
+  el('contenido-indicadores').innerHTML = `
+    ${renderizarKPIs(indicadores)}
+    ${renderizarGraficaDias(serie)}
+    ${renderizarRanking(indicadores.ranking)}
+    ${renderizarComparativoVehiculo(porVehiculo)}
+    ${renderizarComparativoCliente(porCliente)}
+    <h3>Descargue de canastas</h3>
+    <div class="fila-kpis">
+      <div class="tarjeta-kpi"><span class="valor-kpi">${indicadoresDescargue.cantidadDescargues}</span><span class="etiqueta-kpi">Descargues</span></div>
+      <div class="tarjeta-kpi"><span class="valor-kpi">${formatearDuracion(indicadoresDescargue.tiempoTotalSegundos)}</span><span class="etiqueta-kpi">Tiempo total</span></div>
+      <div class="tarjeta-kpi"><span class="valor-kpi">${indicadoresDescargue.canastillasEncajables}</span><span class="etiqueta-kpi">Canastillas encajables</span></div>
+      <div class="tarjeta-kpi"><span class="valor-kpi">${indicadoresDescargue.canastillasGrandes + indicadoresDescargue.canastillasPequenas}</span><span class="etiqueta-kpi">Canastillas grandes+pequeñas</span></div>
+    </div>`;
+
+  const etiquetasPeriodo = { hoy: 'Hoy', '7dias': 'Últimos 7 días', mes: 'Este mes', todo: 'Todo' };
+  el('encabezado-impresion-tablero').innerHTML = `
+    <h1>Agrícola Guapa — Tablero operativo de despachos</h1>
+    <p>Periodo: ${etiquetasPeriodo[filtro] || filtro} · Generado el ${new Date().toLocaleString('es-CO')}</p>`;
+}
+
+async function abrirPantallaIndicadores() {
+  mostrarPantalla('pantalla-indicadores');
+  await cargarEstadoCompletoSeguro();
+  renderizarIndicadores(el('campo-filtro-periodo').value);
+}
+
+function generarPdfTablero() {
+  window.print();
+}
+
+// ===========================================================================
+// ARRANQUE
+// ===========================================================================
+
+async function iniciar() {
+  el('form-login').addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    const mensajeError = el('mensaje-error-login');
+    mensajeError.hidden = true;
+    const boton = el('boton-ingresar');
+    boton.disabled = true;
+    boton.textContent = 'Ingresando…';
+    try {
+      const ok = await verificarAcceso(el('campo-password').value);
+      if (!ok) {
+        mensajeError.textContent = 'Contraseña incorrecta.';
+        mensajeError.hidden = false;
+        return;
+      }
+      localStorage.setItem(LLAVE_LOCAL_HASH, passwordHashActual);
+      el('campo-password').value = '';
+      await iniciarPantallaPrincipal();
+    } catch (error) {
+      mensajeError.textContent = error.message || 'No se pudo verificar el acceso. Revisa la conexión.';
+      mensajeError.hidden = false;
+    } finally {
+      boton.disabled = false;
+      boton.textContent = 'Ingresar';
+    }
+  });
+
+  el('boton-cerrar-sesion').addEventListener('click', () => {
+    localStorage.removeItem(LLAVE_LOCAL_HASH);
+    passwordHashActual = null;
+    mostrarPantalla('pantalla-login');
+  });
+
+  // ---- Herramientas ----
+  el('boton-herramientas').addEventListener('click', () => {
+    const panel = el('panel-herramientas');
+    panel.hidden = !panel.hidden;
+  });
+  el('boton-ver-catalogos').addEventListener('click', mostrarDiagnosticoCatalogos);
+  el('boton-gestionar-causas').addEventListener('click', abrirPantallaGestionCausas);
+  el('boton-gestionar-catalogos').addEventListener('click', abrirPantallaGestionCatalogos);
+
+  el('boton-agregar-vehiculo-catalogo').addEventListener('click', async () => {
+    const mensajeError = el('mensaje-error-vehiculos');
+    mensajeError.hidden = true;
+    try {
+      await agregarVehiculoRapido(el('campo-nuevo-vehiculo-placa').value);
+      el('campo-nuevo-vehiculo-placa').value = '';
+      renderizarListaVehiculosCatalogo();
+    } catch (error) {
+      mensajeError.textContent = error.message || 'No se pudo agregar el vehículo.';
+      mensajeError.hidden = false;
+    }
+  });
+
+  el('boton-agregar-conductor-catalogo').addEventListener('click', async () => {
+    const mensajeError = el('mensaje-error-conductores');
+    mensajeError.hidden = true;
+    try {
+      await agregarConductorRapido(el('campo-nuevo-conductor-nombre').value);
+      el('campo-nuevo-conductor-nombre').value = '';
+      renderizarListaConductoresCatalogo();
+    } catch (error) {
+      mensajeError.textContent = error.message || 'No se pudo agregar el conductor.';
+      mensajeError.hidden = false;
+    }
+  });
+
+  el('boton-agregar-cliente-catalogo').addEventListener('click', async () => {
+    const mensajeError = el('mensaje-error-clientes');
+    mensajeError.hidden = true;
+    try {
+      await agregarCliente({
+        nombre: el('campo-nuevo-cliente-nombre').value,
+        categoria: el('campo-nuevo-cliente-categoria').value,
+      });
+      el('campo-nuevo-cliente-nombre').value = '';
+      renderizarListaClientesCatalogo();
+    } catch (error) {
+      mensajeError.textContent = error.message || 'No se pudo agregar el cliente.';
+      mensajeError.hidden = false;
+    }
+  });
+
+  el('boton-instalar-app').addEventListener('click', async () => {
+    const mensaje = el('mensaje-instalar');
+    mensaje.hidden = false;
+
+    const yaInstalada =
+      window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    if (yaInstalada) {
+      mensaje.textContent = 'Esta aplicación ya está instalada en este celular.';
+      return;
+    }
+
+    if (promptInstalacionApp) {
+      mensaje.hidden = true;
+      promptInstalacionApp.prompt();
+      const resultado = await promptInstalacionApp.userChoice;
+      promptInstalacionApp = null;
+      if (resultado.outcome !== 'accepted') {
+        mensaje.hidden = false;
+        mensaje.textContent = 'No se instaló. Puedes intentarlo de nuevo cuando quieras desde este mismo botón.';
+      }
+      return;
+    }
+
+    const enIphone = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (enIphone) {
+      mensaje.textContent =
+        'En iPhone: toca el botón Compartir (el cuadro con la flecha hacia arriba, abajo en Safari) y luego elige "Agregar a pantalla de inicio".';
+      return;
+    }
+
+    mensaje.textContent =
+      'Este navegador no ofrece instalación automática. Ábrela con Chrome en un celular Android para instalarla como aplicación, o sigue usando el link normalmente — funciona igual.';
+  });
+
+  el('boton-respaldar-datos').addEventListener('click', () => {
+    const mensajeError = el('mensaje-respaldo');
+    const mensajeOk = el('mensaje-respaldo-ok');
+    mensajeError.hidden = true;
+    try {
+      descargarRespaldoComoArchivo();
+      mensajeOk.textContent = 'Copia descargada.';
+      mensajeOk.hidden = false;
+    } catch (error) {
+      mensajeError.textContent = 'No se pudo generar la copia.';
+      mensajeError.hidden = false;
+      return;
+    }
+  });
+
+  el('boton-borrar-prueba').addEventListener('click', async () => {
+    const mensajeError = el('mensaje-borrar-prueba');
+    const mensajeOk = el('mensaje-borrar-prueba-ok');
+    mensajeError.hidden = true;
+    mensajeOk.hidden = true;
+    try {
+      const cantidad = contarDatosOperativos();
+      if (cantidad === 0) {
+        mensajeOk.textContent = 'La hoja compartida ya no tiene cargues, paradas, checklist ni descargues guardados.';
+        mensajeOk.hidden = false;
+        return;
+      }
+      const primeraConfirmacion = window.confirm(
+        `Hay ${cantidad} registros operativos guardados EN LA HOJA COMPARTIDA (de todos los supervisores). ` +
+          `Esto los borra TODOS — no se puede deshacer. No afecta los catálogos (clientes, vehículos, causas, etc.). ¿Continuar?`,
+      );
+      if (!primeraConfirmacion) return;
+      const segundaConfirmacion = window.confirm('Última confirmación: se van a borrar TODOS los cargues, paradas, checklist y descargues de TODOS los celulares. ¿Estás seguro?');
+      if (!segundaConfirmacion) return;
+
+      await borrarDatosOperativos();
+      mensajeOk.textContent = 'Listo: se borraron los datos de prueba de la hoja compartida.';
+      mensajeOk.hidden = false;
+      renderizarListaCargues();
+    } catch (error) {
+      mensajeError.textContent = error.message || 'No se pudieron borrar los datos.';
+      mensajeError.hidden = false;
+    }
+  });
+
+  // ---- Selector "+": Cargue o Descargue ----
+  el('boton-nuevo-cargue').addEventListener('click', () => { el('selector-tipo-nuevo').hidden = false; });
+  el('boton-cancelar-selector').addEventListener('click', () => { el('selector-tipo-nuevo').hidden = true; });
+  el('boton-elegir-cargue').addEventListener('click', async () => { el('selector-tipo-nuevo').hidden = true; await abrirPantallaNuevoCargue(); });
+  el('boton-elegir-descargue').addEventListener('click', async () => { el('selector-tipo-nuevo').hidden = true; await abrirPantallaNuevoDescargue(); });
+
+  el('boton-volver-desde-nuevo').addEventListener('click', iniciarPantallaPrincipal);
+  el('boton-volver-desde-detalle').addEventListener('click', () => {
+    if (origenDetalleCargue === 'historial') abrirPantallaHistorial(); else iniciarPantallaPrincipal();
+  });
+
+  el('boton-ver-historial').addEventListener('click', abrirPantallaHistorial);
+  el('boton-volver-desde-historial').addEventListener('click', iniciarPantallaPrincipal);
+
+  el('boton-ver-indicadores').addEventListener('click', abrirPantallaIndicadores);
+  el('boton-volver-desde-indicadores').addEventListener('click', iniciarPantallaPrincipal);
+  el('campo-filtro-periodo').addEventListener('change', () => renderizarIndicadores(el('campo-filtro-periodo').value));
+  el('boton-generar-pdf-tablero').addEventListener('click', generarPdfTablero);
+
+  el('campo-cliente').addEventListener('change', (e) => poblarSelectDestinos(e.target.value));
+  manejarSeleccionConOpcionNueva('campo-vehiculo', 'bloque-nuevo-vehiculo');
+  manejarSeleccionConOpcionNueva('campo-conductor', 'bloque-nuevo-conductor');
+  el('boton-guardar-vehiculo').addEventListener('click', async () => {
+    const id = await agregarVehiculoRapido(el('campo-nueva-placa').value);
+    poblarSelectVehiculos(id);
+    el('bloque-nuevo-vehiculo').hidden = true;
+    el('campo-nueva-placa').value = '';
+  });
+  el('boton-guardar-conductor').addEventListener('click', async () => {
+    const id = await agregarConductorRapido(el('campo-nuevo-conductor').value);
+    poblarSelectConductores(id);
+    el('bloque-nuevo-conductor').hidden = true;
+    el('campo-nuevo-conductor').value = '';
+  });
+  el('form-nuevo-cargue').addEventListener('submit', manejarEnvioNuevoCargue);
+
+  // ---- Descargue de canastas ----
+  el('boton-volver-desde-descargue').addEventListener('click', iniciarPantallaPrincipal);
+  el('boton-volver-tras-descargue').addEventListener('click', iniciarPantallaPrincipal);
+  el('boton-otro-descargue').addEventListener('click', abrirPantallaNuevoDescargue);
+  el('campo-descargue-cliente').addEventListener('change', (e) => poblarSelectDestinosDescargue(e.target.value));
+  el('campo-descargue-vehiculo').addEventListener('change', (e) => { el('bloque-descargue-nuevo-vehiculo').hidden = e.target.value !== '__nuevo__'; });
+  el('campo-descargue-conductor').addEventListener('change', (e) => { el('bloque-descargue-nuevo-conductor').hidden = e.target.value !== '__nuevo__'; });
+  el('boton-descargue-guardar-vehiculo').addEventListener('click', async () => {
+    const id = await agregarVehiculoRapido(el('campo-descargue-nueva-placa').value);
+    poblarSelectVehiculosDescargue(id);
+    el('bloque-descargue-nuevo-vehiculo').hidden = true;
+    el('campo-descargue-nueva-placa').value = '';
+  });
+  el('boton-descargue-guardar-conductor').addEventListener('click', async () => {
+    const id = await agregarConductorRapido(el('campo-descargue-nuevo-conductor').value);
+    poblarSelectConductoresDescargue(id);
+    el('bloque-descargue-nuevo-conductor').hidden = true;
+    el('campo-descargue-nuevo-conductor').value = '';
+  });
+  el('form-nuevo-descargue').addEventListener('submit', manejarEnvioNuevoDescargue);
+
+  // ---- Gestión de causas ----
+  el('boton-volver-desde-causas').addEventListener('click', iniciarPantallaPrincipal);
+  el('boton-volver-desde-catalogos').addEventListener('click', iniciarPantallaPrincipal);
+  el('boton-agregar-causa').addEventListener('click', async () => {
+    const mensajeError = el('mensaje-error-causas');
+    const mensajeOk = el('mensaje-ok-causas');
+    mensajeError.hidden = true;
+    mensajeOk.hidden = true;
+    try {
+      await agregarCausa({
+        nombre: el('campo-nueva-causa-nombre').value,
+        categoriaId: el('campo-nueva-causa-categoria').value,
+        responsableId: el('campo-nueva-causa-responsable').value,
+        tipoTiempoId: el('campo-nueva-causa-tipo').value,
+        requiereDescripcion: el('campo-nueva-causa-requiere-desc').checked,
+      });
+      el('campo-nueva-causa-nombre').value = '';
+      el('campo-nueva-causa-requiere-desc').checked = false;
+      mensajeOk.textContent = 'Causa agregada.';
+      mensajeOk.hidden = false;
+      renderizarListaCausas();
+    } catch (error) {
+      mensajeError.textContent = error.message || 'No se pudo agregar la causa.';
+      mensajeError.hidden = false;
+    }
+  });
+
+  // ---- Entrada silenciosa si ya había una sesión guardada en este celular ----
+  const hashGuardado = localStorage.getItem(LLAVE_LOCAL_HASH);
+  if (hashGuardado) {
+    passwordHashActual = hashGuardado;
+    try {
+      await cargarEstadoCompleto();
+      await iniciarPantallaPrincipal();
+      return;
+    } catch (error) {
+      // La contraseña guardada ya no sirve (o no hay señal) — se pide de nuevo.
+      localStorage.removeItem(LLAVE_LOCAL_HASH);
+      passwordHashActual = null;
+    }
+  }
+  mostrarPantalla('pantalla-login');
+}
+
+iniciar();
   </script>
 </body>
 </html>
