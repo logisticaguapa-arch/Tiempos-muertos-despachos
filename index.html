@@ -1553,10 +1553,11 @@ async function eliminarParada(paradaId) {
   _aplicarEnEstado('cargues', respuesta.cargue);
 }
 
-async function finalizarCargue(cargueId, horaFinLocalStr, canastillas) {
+async function finalizarCargue(cargueId, horaFinLocalStr, canastillas, foto) {
   const horaFinISO = isoDesdeLocal(horaFinLocalStr);
   if (!horaFinISO) throw new Error('Indica la hora de fin del cargue.');
-  const respuesta = await apiPost('finalizarCargue', { cargueId, horaFinISO, canastillas });
+  const datosFoto = foto && foto.fotoBase64 ? { fotoBase64: foto.fotoBase64, fotoMimeType: foto.fotoMimeType } : {};
+  const respuesta = await apiPost('finalizarCargue', { cargueId, horaFinISO, canastillas, ...datosFoto });
   _aplicarEnEstado('cargues', respuesta.cargue);
 }
 
@@ -2026,6 +2027,49 @@ async function manejarEnvioNuevoCargue(evento) {
 let origenDetalleCargue = 'principal';
 let vistaTiempos = 'cargue';
 
+// Foto tomada para "Finalizar cargue": se guarda aquí (ya comprimida, lista
+// para enviar) mientras el supervisor termina de llenar el resto del
+// formulario. Se limpia cada vez que se vuelve a pintar el detalle del
+// cargue (pintarDetalleCargue), para no arrastrar la foto de un cargue a otro.
+let fotoCargueBase64Actual = null;
+let fotoCargueMimeActual = null;
+
+// Comprime la foto en el propio celular ANTES de mandarla (si no, una foto
+// de cámara sin comprimir puede pesar 3-5 MB y hace que "Finalizar cargue"
+// se sienta lentísimo, o incluso falle con mala señal). Se reduce a un
+// tamaño máximo razonable para ver el cargue, no para imprimir un afiche.
+function comprimirFotoCargue_(archivo) {
+  return new Promise((resolve, reject) => {
+    const lector = new FileReader();
+    lector.onerror = () => reject(new Error('No se pudo leer la foto.'));
+    lector.onload = () => {
+      const imagen = new Image();
+      imagen.onerror = () => reject(new Error('No se pudo procesar la foto.'));
+      imagen.onload = () => {
+        const ladoMaximo = 1280;
+        let { width, height } = imagen;
+        if (width > ladoMaximo || height > ladoMaximo) {
+          if (width >= height) {
+            height = Math.round(height * (ladoMaximo / width));
+            width = ladoMaximo;
+          } else {
+            width = Math.round(width * (ladoMaximo / height));
+            height = ladoMaximo;
+          }
+        }
+        const lienzo = document.createElement('canvas');
+        lienzo.width = width;
+        lienzo.height = height;
+        lienzo.getContext('2d').drawImage(imagen, 0, 0, width, height);
+        const dataUrl = lienzo.toDataURL('image/jpeg', 0.72);
+        resolve({ base64: dataUrl.split(',')[1], mime: 'image/jpeg', dataUrl });
+      };
+      imagen.src = lector.result;
+    };
+    lector.readAsDataURL(archivo);
+  });
+}
+
 // Se usa justo después de crear/guardar algo en ESTE mismo celular: como la
 // respuesta del servidor ya viene aplicada a ESTADO (ver _aplicarEnEstado),
 // no hace falta pedir de nuevo la información completa — eso es lo que
@@ -2046,6 +2090,8 @@ async function abrirDetalleCargue(cargueId, origenPantalla) {
 }
 
 async function pintarDetalleCargue(cargueId) {
+  fotoCargueBase64Actual = null;
+  fotoCargueMimeActual = null;
   const [cargueConDetalle] = _cargesConDetalle(ESTADO.cargues.filter((c) => c.id === cargueId));
   if (!cargueConDetalle) {
     window.alert('Ya no se encuentra ese cargue (puede que se haya borrado o cerrado desde otro celular).');
@@ -2237,7 +2283,8 @@ async function pintarSeccionTiempos(cargue) {
       <div class="fila"><span>Tiempo productivo</span><span>${formatearDuracion(cargue.tiempoProductivoCargue)}</span></div>
       <div class="fila"><span>Canastillas encajables</span><span>${cargue.canastillasEncajables ?? 0}</span></div>
       <div class="fila"><span>Canastillas grandes</span><span>${cargue.canastillasGrandes ?? 0}</span></div>
-      <div class="fila"><span>Canastillas pequeñas</span><span>${cargue.canastillasPequenas ?? 0}</span></div>`;
+      <div class="fila"><span>Canastillas pequeñas</span><span>${cargue.canastillasPequenas ?? 0}</span></div>
+      ${cargue.fotoUrl ? `<a href="${cargue.fotoUrl}" target="_blank" rel="noopener" style="display:block;margin-top:8px;"><img src="${cargue.fotoUrl}" alt="Foto del cargue" style="max-width:100%;border-radius:8px;" /></a>` : ''}`;
   } else {
     // EN_CARGUE o EN_PARADA: todavía en curso, solo se conoce la hora de inicio.
     resumenCargueHTML = `<div class="fila"><span>Hora inicio</span><span>${formatearHora(cargue.horaInicioCargue)}</span></div>`;
@@ -2279,6 +2326,14 @@ async function pintarSeccionTiempos(cargue) {
       <input id="campo-canastillas-grandes" type="number" inputmode="numeric" min="0" value="0" />
       <label for="campo-canastillas-pequenas">Canastillas pequeñas</label>
       <input id="campo-canastillas-pequenas" type="number" inputmode="numeric" min="0" value="0" />
+      <label>Foto del cargue (opcional)</label>
+      <input id="campo-foto-cargue" type="file" accept="image/*" capture="environment" hidden />
+      <button type="button" id="boton-tomar-foto-cargue" class="boton-secundario">📷 Tomar foto</button>
+      <div id="vista-previa-foto-cargue" hidden style="margin:8px 0;">
+        <img id="imagen-previa-foto-cargue" alt="Foto del cargue" style="max-width:100%;border-radius:8px;" />
+        <button type="button" id="boton-quitar-foto-cargue" class="boton-secundario">Quitar foto</button>
+      </div>
+      <p id="mensaje-error-foto-cargue" class="mensaje-error" hidden></p>
       <button type="button" id="boton-finalizar-cargue" class="boton-primario">Finalizar cargue</button>
       <p id="mensaje-error-tab-cargue" class="mensaje-error" hidden></p>`;
   } else if (cargue.estado === 'EN_PARADA') {
@@ -2462,6 +2517,49 @@ function wireAccionesTiempos(cargue) {
     });
   }
 
+  const campoFotoCargue = el('campo-foto-cargue');
+  const botonTomarFotoCargue = el('boton-tomar-foto-cargue');
+  const botonQuitarFotoCargue = el('boton-quitar-foto-cargue');
+  const vistaPreviaFotoCargue = el('vista-previa-foto-cargue');
+  const imagenPreviaFotoCargue = el('imagen-previa-foto-cargue');
+  const mensajeErrorFoto = el('mensaje-error-foto-cargue');
+  if (botonTomarFotoCargue && campoFotoCargue) {
+    botonTomarFotoCargue.addEventListener('click', () => campoFotoCargue.click());
+    campoFotoCargue.addEventListener('change', async () => {
+      const archivo = campoFotoCargue.files && campoFotoCargue.files[0];
+      if (!archivo) return;
+      mensajeErrorFoto.hidden = true;
+      botonTomarFotoCargue.disabled = true;
+      botonTomarFotoCargue.textContent = 'Procesando foto…';
+      try {
+        const { base64, mime, dataUrl } = await comprimirFotoCargue_(archivo);
+        fotoCargueBase64Actual = base64;
+        fotoCargueMimeActual = mime;
+        imagenPreviaFotoCargue.src = dataUrl;
+        vistaPreviaFotoCargue.hidden = false;
+        botonTomarFotoCargue.textContent = '📷 Cambiar foto';
+      } catch (error) {
+        fotoCargueBase64Actual = null;
+        fotoCargueMimeActual = null;
+        mensajeErrorFoto.textContent = error.message || 'No se pudo procesar la foto. Puedes finalizar el cargue sin ella.';
+        mensajeErrorFoto.hidden = false;
+        botonTomarFotoCargue.textContent = '📷 Tomar foto';
+      } finally {
+        botonTomarFotoCargue.disabled = false;
+        campoFotoCargue.value = '';
+      }
+    });
+  }
+  if (botonQuitarFotoCargue) {
+    botonQuitarFotoCargue.addEventListener('click', () => {
+      fotoCargueBase64Actual = null;
+      fotoCargueMimeActual = null;
+      vistaPreviaFotoCargue.hidden = true;
+      imagenPreviaFotoCargue.src = '';
+      botonTomarFotoCargue.textContent = '📷 Tomar foto';
+    });
+  }
+
   const botonFinalizarCargue = el('boton-finalizar-cargue');
   if (botonFinalizarCargue) {
     botonFinalizarCargue.addEventListener('click', async () => {
@@ -2473,7 +2571,7 @@ function wireAccionesTiempos(cargue) {
           encajables: el('campo-canastillas-encajables').value,
           grandes: el('campo-canastillas-grandes').value,
           pequenas: el('campo-canastillas-pequenas').value,
-        });
+        }, fotoCargueBase64Actual ? { fotoBase64: fotoCargueBase64Actual, fotoMimeType: fotoCargueMimeActual } : null);
         await pintarDetalleCargue(cargue.id);
       } catch (error) {
         mensajeError.textContent = error.message || 'No se pudo finalizar el cargue.';
