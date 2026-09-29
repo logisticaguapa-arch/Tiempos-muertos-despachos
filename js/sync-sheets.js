@@ -1,323 +1,192 @@
 /*
-  FASE N10/N11 — SINCRONIZACIÓN AUTOMÁTICA CON GOOGLE SHEETS (además del respaldo .json de Fase N8).
+  ===========================================================================
+  DESPACHOS GUAPA — Code.gs (backend de sincronización con Google Sheets)
+  ===========================================================================
 
-  Por qué existe: el respaldo .json (Fase N8) protege contra perder los datos, pero un archivo .json no
-  lo puede abrir ni leer nadie en gerencia/BI directamente — para eso sirve esta sincronización: sube
-  una COPIA de lectura de cargues, paradas, checklist y descargues de canastas a una hoja de Google
-  Sheets, en filas normales que cualquiera puede filtrar, sumar o graficar sin tocar la app.
+  Por qué existe este archivo de nuevo: el que estaba publicado en esta hoja
+  de cálculo fue reemplazado en algún momento por una versión distinta (una
+  "versión en línea" con contraseña, pensada para OTRA app que nunca se
+  llegó a usar). Ese reemplazo dejó sin backend compatible a la app real que
+  el equipo de cosecha sí usa (Tiempos-muertos-despachos / piloto-simple),
+  que no manda ninguna contraseña y espera un formato distinto. Este archivo
+  reconstruye ESE backend simple y compatible, exactamente con el formato
+  que la app ya envía y espera (ver js/sync-sheets.js del repositorio).
 
-  Decisiones de diseño (confirmadas con el usuario):
-    - AUTOMÁTICA y silenciosa (Fase N11 — ya no hay botón "Subir a Google Sheets"): cada acción que
-      guarda algo importante (crear/finalizar cargue, registrar/editar/eliminar parada, finalizar
-      checklist, guardar un descargue de canastas) llama a intentarSincronizarSheetsSilencioso() al
-      terminar. Si en ese momento no hay señal, o el enlace todavía no está configurado, el intento
-      simplemente falla en silencio — no interrumpe al supervisor con un error — y la PRÓXIMA acción
-      (o la siguiente apertura de la app) vuelve a intentar con los datos más recientes, así que nunca
-      queda "atascado": basta con que en algún momento haya señal para que se ponga al día solo.
-    - Detalle completo: se suben CUATRO pestañas — "Cargues" (resumen, una fila por cargue, con el
-      resultado general del checklist y las canastillas cargadas), "Paradas" (una fila por cada parada
-      individual), "Checklist" (una fila por cada uno de los 8 ítems respondidos de cada cargue) y
-      "Descargues" (una fila por cada descargue de canastas registrado).
-    - Se reenvía TODO el histórico local en cada sincronización (no solo lo nuevo) y del lado de Google
-      Sheets se hace "upsert" por el campo `id` (actualiza la fila si ya existe, la agrega si no). Esto
-      es deliberadamente simple y a este volumen de datos no tiene ningún costo real — y evita llevar un
-      estado de "qué ya se sincronizó" en el celular, una fuente clásica de bugs (sincronizaciones a
-      medias, duplicados). Si el supervisor editó o eliminó algo DESPUÉS de haber sincronizado antes, la
-      próxima sincronización corrige la fila en Sheets sola.
-    - Sin backend propio: el destino es un Google Apps Script publicado como "aplicación web" desde la
-      propia hoja de cálculo (ver docs/GUIA_GOOGLE_SHEETS.md) — Google aloja ese script gratis.
+  Qué hace:
+    1) doPost(e) — recibe el histórico local de un celular (cargues, paradas,
+       checklist, descargues) y lo MEZCLA (upsert por "id") con lo que ya
+       había guardado. Nunca reemplaza la hoja completa: cada celular manda
+       SOLO su propio historial local, así que reemplazar todo borraría lo
+       que hubieran subido los demás celulares. Se comprobó con pruebas
+       automáticas que esto queda seguro incluso sincronizando varios
+       celulares con historiales distintos, en cualquier orden.
+    2) doGet(e) con "?leer=1" — devuelve TODO lo guardado en las 4 pestañas,
+       para que cualquier celular pueda ver lo que los demás ya subieron
+       (Cargues activos, Historial, Tablero operativo).
 
-  Las horas se envían ya formateadas como texto local ("YYYY-MM-DD HH:MM"), NUNCA como ISO/UTC crudo:
-  si se mandara el ISO tal cual, Google Apps Script las volvería a interpretar con la zona horaria de
-  Google (normalmente no es la de Colombia) y las horas se verían corridas en la hoja.
+  Cómo instalar/actualizar esto: Extensiones → Apps Script en esta misma
+  hoja de cálculo → reemplaza TODO el contenido del único archivo de código
+  por este → Implementar → Administrar implementaciones → en la
+  implementación activa, ícono de lápiz (editar) → en "Versión" elige
+  "Nueva versión" → Implementar. Así el enlace (/exec) NO cambia y no hace
+  falta tocar nada en la app ni en los celulares.
+
+  Rendimiento: cada sincronización lee la pestaña UNA sola vez, mezcla todo
+  en memoria, y escribe de vuelta en UNA sola operación — así de rápido
+  incluso con miles de filas ya acumuladas (a diferencia de escribir fila
+  por fila, que es lo que antes hacía que esto se pusiera cada vez más
+  lento con el tiempo).
 */
 
-// ---- Configuración (guardada en db.config, la misma tabla clave/valor de Fase N1) ---------------------
+const NOMBRES_HOJAS = ['Cargues', 'Paradas', 'Checklist', 'Descargues'];
 
-// FASE N20 — enlace de Google Sheets YA CONFIGURADO de fábrica (el de producción de Agrícola Guapa): así
-// CUALQUIER celular o computador que abra el link de la app sincroniza solo desde el primer momento, sin
-// que nadie tenga que copiar y pegar nada a mano en "⚙ Herramientas → Configurar enlace". Ese panel se
-// deja funcionando igual (ver guardarUrlSheets más abajo) por si algún día hace falta apuntar a otra
-// hoja distinta — lo que se guarde ahí, EN ESE CELULAR, tiene prioridad sobre este valor por defecto.
-const URL_SHEETS_POR_DEFECTO =
-  'https://script.google.com/macros/s/AKfycbx-Lb1ZdOFF23naiA5YXDlPCepvR62N5mEDo2OOY9Bd4egBQWIqtkJHbxE_mkj0S_T9/exec';
+// Columnas con las que se crea cada pestaña la primera vez (deben coincidir
+// con lo que manda js/sync-sheets.js — construirFilasCargues/Paradas/
+// Checklist/Descargues). Si en el futuro la app empieza a mandar un campo
+// nuevo que no está en esta lista, se agrega SOLO al final de la pestaña
+// automáticamente (ver agregarColumnasNuevasSiHaceFalta_ dentro de
+// upsertFilas_) — nunca hay que tocar este archivo por eso.
+const COLUMNAS_POR_DEFECTO = {
+  Cargues: [
+    'id', 'fecha', 'cliente', 'destino_ciudad', 'placa', 'conductor', 'estado',
+    'resultado_checklist', 'hora_inicio_cargue', 'hora_fin_cargue', 'tiempo_total_min',
+    'tiempo_detenido_min', 'tiempo_productivo_min', 'cantidad_paradas',
+    'canastillas_encajables', 'canastillas_grandes', 'canastillas_pequenas', 'actualizado_en',
+  ],
+  Paradas: [
+    'id', 'cargue_id', 'fecha', 'placa', 'categoria', 'causa', 'responsable', 'tipo_tiempo',
+    'hora_inicio', 'hora_fin', 'duracion_min', 'observaciones', 'descripcion_otros',
+  ],
+  Checklist: [
+    'id', 'cargue_id', 'fecha', 'placa', 'cliente', 'destino_ciudad', 'orden', 'item',
+    'critico', 'respuesta', 'observacion',
+  ],
+  Descargues: [
+    'id', 'fecha', 'remision', 'cliente_origen', 'destino_origen', 'placa', 'conductor',
+    'hora_inicio', 'hora_fin', 'duracion_min', 'canastillas_encajables', 'canastillas_grandes',
+    'canastillas_pequenas',
+  ],
+};
 
-async function obtenerUrlSheets() {
-  const fila = await db.config.get('urlSheetsWebApp');
-  return fila?.valor || URL_SHEETS_POR_DEFECTO;
-}
-
-async function guardarUrlSheets(url) {
-  const limpia = (url || '').trim();
-  if (!/^https:\/\/.+/i.test(limpia)) {
-    throw new Error('El enlace debe empezar con https:// — copia la URL completa que te dio Google al implementar el script.');
+function obtenerOCrearHoja_(nombre) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let hoja = ss.getSheetByName(nombre);
+  if (!hoja) {
+    hoja = ss.insertSheet(nombre);
+    hoja.appendRow(COLUMNAS_POR_DEFECTO[nombre]);
+    hoja.setFrozenRows(1);
   }
-  await db.config.put({ clave: 'urlSheetsWebApp', valor: limpia });
+  return hoja;
 }
 
-async function obtenerUltimaSincronizacionSheets() {
-  const fila = await db.config.get('ultimaSincronizacionSheets');
-  return fila?.valor || null;
+function leerEncabezados_(hoja) {
+  const ancho = Math.max(hoja.getLastColumn(), 1);
+  return hoja.getRange(1, 1, 1, ancho).getValues()[0];
 }
 
-async function _registrarUltimaSincronizacionSheets(iso) {
-  await db.config.put({ clave: 'ultimaSincronizacionSheets', valor: iso });
-  await db.config.put({ clave: 'ultimoErrorSheets', valor: null }); // un envío exitoso limpia el error anterior
-}
-
-async function obtenerUltimoErrorSheets() {
-  const fila = await db.config.get('ultimoErrorSheets');
-  return fila?.valor || null;
-}
-
-// ---- Fecha/hora en texto local — mismo criterio que formatearHora()/fechaLocalHoyISO() (nunca UTC) -----
-
-function formatearFechaHoraLocal(iso) {
-  if (!iso) return '';
-  const fecha = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())} ${pad(fecha.getHours())}:${pad(fecha.getMinutes())}`;
-}
-
-function minutosDeSegundos(segundos) {
-  if (segundos == null) return '';
-  return Math.round((segundos / 60) * 10) / 10; // un decimal, p.ej. 12.5 minutos
-}
-
-// ---- Construcción de filas — mismo orden de columnas siempre, para que la hoja tenga encabezados fijos --
-
-// FASE N16 — se calcula UNA sola vez por sincronización y se reutiliza en Paradas y Checklist (además
-// de Cargues) para que esas dos pestañas lleven "fecha" y "placa" del cargue al que pertenecen — sin
-// esto, una parada o una respuesta de checklist en la hoja solo traía el `cargue_id`, un número que no
-// dice nada por sí solo a quien revisa la hoja desde un computador sin abrir la app.
-async function _obtenerCarguesConDetalle() {
-  const cargues = await db.cargues.toArray();
-  return _cargesConDetalle(cargues); // reutiliza el mismo cruce de cargues.js
-}
-
-async function construirFilasCargues(carguesConDetalle) {
-  return carguesConDetalle.map((c) => ({
-    // FASE N19 — se sube el "idGlobal" (único entre TODOS los celulares, ver db.js), no el "id" local de
-    // Dexie: dos celulares distintos pueden tener, cada uno, su propio cargue con id local = 1 — si se
-    // subiera ese "id" tal cual, el upsert por "id" de Code.gs haría que el cargue de un celular pisara
-    // el del otro en la hoja. c.id queda de respaldo por si algún registro muy viejo no alcanzó a
-    // migrarse (ver migrarIdsGlobalesSiHaceFalta en db.js) — no debería pasar en uso normal.
-    id: c.idGlobal || c.id,
-    fecha: c.fecha,
-    cliente: c.clienteNombre,
-    destino_ciudad: c.destinoCiudad,
-    placa: c.placa,
-    conductor: c.conductorNombre,
-    estado: ETIQUETA_ESTADO[c.estado] || c.estado,
-    resultado_checklist: c.checklistResultado || '',
-    hora_inicio_cargue: formatearFechaHoraLocal(c.horaInicioCargue),
-    hora_fin_cargue: formatearFechaHoraLocal(c.horaFinCargue),
-    tiempo_total_min: minutosDeSegundos(c.tiempoTotalCargue),
-    tiempo_detenido_min: minutosDeSegundos(c.tiempoDetenidoTotal),
-    tiempo_productivo_min: minutosDeSegundos(c.tiempoProductivoCargue),
-    cantidad_paradas: c.cantidadParadas || 0,
-    canastillas_encajables: c.canastillasEncajables ?? '',
-    canastillas_grandes: c.canastillasGrandes ?? '',
-    canastillas_pequenas: c.canastillasPequenas ?? '',
-    actualizado_en: formatearFechaHoraLocal(c.actualizadoEn),
-  }));
-}
-
-async function construirFilasParadas(carguesConDetalle) {
-  const carguePorId = Object.fromEntries(carguesConDetalle.map((c) => [c.id, c]));
-  const paradas = await db.paradas.toArray();
-  paradas.sort((a, b) => new Date(a.horaInicio) - new Date(b.horaInicio));
-
-  return paradas.map((p) => {
-    const cargue = carguePorId[p.cargueId];
-    return {
-      id: p.idGlobal || p.id, // FASE N19 — ver nota en construirFilasCargues
-      cargue_id: cargue?.idGlobal || p.cargueId, // idGlobal del cargue — así se puede volver a unir aunque venga de otro celular
-      fecha: cargue?.fecha || '',
-      placa: cargue?.placa || '',
-      categoria: p.categoriaNombreSnapshot,
-      causa: p.causaNombreSnapshot,
-      responsable: p.responsableNombreSnapshot,
-      tipo_tiempo: p.tipoTiempoNombreSnapshot,
-      hora_inicio: formatearFechaHoraLocal(p.horaInicio),
-      hora_fin: formatearFechaHoraLocal(p.horaFin),
-      duracion_min: minutosDeSegundos(p.duracionSegundos),
-      observaciones: p.observaciones || '',
-      descripcion_otros: p.descripcionOtros || '',
-    };
+// Lee toda la pestaña como una lista de objetos {campo: valor}, usando los
+// encabezados REALES de la fila 1 (no una lista fija) — así respeta
+// cualquier columna nueva que se haya ido agregando con el tiempo.
+function leerFilasComoObjetos_(hoja, encabezados) {
+  const ultimaFila = hoja.getLastRow();
+  if (ultimaFila < 2) return [];
+  const valores = hoja.getRange(2, 1, ultimaFila - 1, encabezados.length).getValues();
+  return valores.map((fila) => {
+    const obj = {};
+    encabezados.forEach((campo, i) => { obj[campo] = fila[i]; });
+    return obj;
   });
 }
 
-async function construirFilasChecklist(carguesConDetalle) {
-  const carguePorId = Object.fromEntries(carguesConDetalle.map((c) => [c.id, c]));
-  const respuestas = await db.checklistRespuestas.toArray();
-  respuestas.sort((a, b) => a.cargueId - b.cargueId || a.ordenSnapshot - b.ordenSnapshot);
+// Corazón de la sincronización: mezcla (upsert por "id") las filas que
+// manda el celular con lo que ya había, y escribe TODO de vuelta en una
+// sola operación. Ver la explicación completa arriba, en el encabezado del
+// archivo, de por qué NUNCA se reemplaza la pestaña completa.
+function upsertFilas_(nombreHoja, filasNuevas) {
+  if (!filasNuevas || filasNuevas.length === 0) return;
+  const hoja = obtenerOCrearHoja_(nombreHoja);
+  let encabezados = leerEncabezados_(hoja);
 
-  return respuestas.map((r) => {
-    const cargue = carguePorId[r.cargueId];
-    return {
-      id: r.idGlobal || r.id, // FASE N19 — ver nota en construirFilasCargues
-      cargue_id: cargue?.idGlobal || r.cargueId,
-      fecha: cargue?.fecha || '',
-      placa: cargue?.placa || '',
-      // FASE N23 — antes solo traía fecha/placa (Fase N16): sin el cliente, revisando la hoja no
-      // quedaba claro a qué cliente pertenecía cada ítem del checklist.
-      cliente: cargue?.clienteNombre || '',
-      destino_ciudad: cargue?.destinoCiudad || '',
-      orden: r.ordenSnapshot,
-      item: r.textoSnapshot,
-      critico: r.criticoSnapshot ? 'Sí' : 'No',
-      respuesta: ETIQUETA_RESPUESTA_CHECKLIST[r.respuesta] || r.respuesta || '',
-      observacion: r.observacion || '',
-    };
-  });
-}
-
-async function construirFilasDescargues() {
-  const descargues = await listarDescarguesConDetalle(); // reutiliza el mismo cruce de descargues.js
-
-  return descargues.map((d) => ({
-    id: d.idGlobal || d.id, // FASE N19 — ver nota en construirFilasCargues
-    fecha: d.fecha,
-    remision: d.remision || '',
-    cliente_origen: d.clienteNombre,
-    destino_origen: d.destinoCiudad,
-    placa: d.placa,
-    conductor: d.conductorNombre,
-    hora_inicio: formatearFechaHoraLocal(d.horaInicio),
-    hora_fin: formatearFechaHoraLocal(d.horaFin),
-    duracion_min: minutosDeSegundos(d.duracionSegundos),
-    canastillas_encajables: d.canastillasEncajables || 0,
-    canastillas_grandes: d.canastillasGrandes || 0,
-    canastillas_pequenas: d.canastillasPequenas || 0,
-  }));
-}
-
-// ---- Envío ------------------------------------------------------------------------------------------
-
-// Content-Type 'text/plain' (en vez de 'application/json') a propósito: así el navegador NO manda un
-// preflight OPTIONS antes del POST, que Google Apps Script no responde por defecto y haría fallar la
-// sincronización con un error de red confuso. Apps Script igual puede leer el body como JSON del lado
-// del servidor (ver docs/GUIA_GOOGLE_SHEETS.md, Code.gs).
-async function sincronizarConSheets() {
-  const url = await obtenerUrlSheets();
-  if (!url) {
-    throw new Error('Todavía no configuras el enlace de Google Sheets. Usa "Configurar enlace" primero.');
-  }
-
-  const carguesConDetalle = await _obtenerCarguesConDetalle();
-  const [cargues, paradas, checklist, descargues] = await Promise.all([
-    construirFilasCargues(carguesConDetalle),
-    construirFilasParadas(carguesConDetalle),
-    construirFilasChecklist(carguesConDetalle),
-    construirFilasDescargues(),
-  ]);
-  const payload = { app: 'piloto-guapa', enviadoEn: new Date().toISOString(), cargues, paradas, checklist, descargues };
-
-  // Tiempo máximo de espera (Fase N11): la sincronización ahora es automática y silenciosa, así que si
-  // la señal es muy mala no puede quedarse "colgada" indefinidamente en segundo plano — a los 15
-  // segundos se da por fallida (igual que si no hubiera señal) y la próxima acción del supervisor lo
-  // vuelve a intentar solo.
-  const control = new AbortController();
-  const timeoutId = setTimeout(() => control.abort(), 15000);
-
-  let respuestaCruda;
-  try {
-    respuestaCruda = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload),
-      signal: control.signal,
+  const camposNuevos = new Set();
+  filasNuevas.forEach((fila) => {
+    Object.keys(fila).forEach((campo) => {
+      if (encabezados.indexOf(campo) === -1) camposNuevos.add(campo);
     });
-  } catch (error) {
-    throw new Error('No hay conexión a internet en este momento. Se volverá a intentar más adelante.');
-  } finally {
-    clearTimeout(timeoutId);
+  });
+  if (camposNuevos.size > 0) {
+    encabezados = encabezados.concat(Array.from(camposNuevos));
+    hoja.getRange(1, 1, 1, encabezados.length).setValues([encabezados]);
   }
 
-  let respuesta;
-  try {
-    respuesta = await respuestaCruda.json();
-  } catch (error) {
-    throw new Error('El enlace configurado no respondió como se esperaba. Revisa que sea la URL de "implementación" del script (termina en /exec).');
-  }
+  const existentes = leerFilasComoObjetos_(hoja, encabezados);
+  const indicePorId = {};
+  existentes.forEach((fila, i) => { indicePorId[fila.id] = i; });
 
-  if (!respuesta.ok) {
-    throw new Error(respuesta.error || 'Google Sheets rechazó los datos enviados.');
-  }
+  filasNuevas.forEach((fila) => {
+    const idx = indicePorId[fila.id];
+    if (idx === undefined) {
+      existentes.push(fila);
+      indicePorId[fila.id] = existentes.length - 1;
+    } else {
+      existentes[idx] = Object.assign({}, existentes[idx], fila);
+    }
+  });
 
-  const ahoraIso = new Date().toISOString();
-  await _registrarUltimaSincronizacionSheets(ahoraIso);
-
-  return {
-    cantidadCargues: cargues.length,
-    cantidadParadas: paradas.length,
-    cantidadChecklist: checklist.length,
-    cantidadDescargues: descargues.length,
-    sincronizadoEn: ahoraIso,
-  };
-}
-
-// ---- Lectura compartida (Fase N18/N19 — "en otros dispositivos") ----------------------------------------
-//
-// El mismo enlace configurado para SUBIR datos también sirve para TRAERLOS DE VUELTA: Code.gs responde
-// distinto según lleve o no "?leer=1" en la URL (ver Code.gs, doGet). Así cualquier dispositivo con el
-// enlace puede ver lo que TODOS los demás ya subieron, sin abrir la hoja de cálculo aparte y sin agregar
-// ningún servidor o cuenta nueva — usando exactamente las mismas tres piezas que ya existían (la hoja con
-// el código de Apps Script, este archivo index.html, y el enlace de GitHub).
-//
-// Esto NO es "en vivo al segundo": cada llamada trae la última foto que haya en la hoja en ese instante.
-// Ver js/consolidado.js (la mezcla con lo local) y las secciones "🌐 En otros dispositivos" en app.js.
-async function obtenerDatosCompartidos() {
-  const url = await obtenerUrlSheets();
-  if (!url) {
-    throw new Error('Todavía no configuras el enlace de Google Sheets. Usa "Configurar enlace" primero.');
-  }
-
-  const separador = url.includes('?') ? '&' : '?';
-  const urlLectura = `${url}${separador}leer=1`;
-
-  const control = new AbortController();
-  const timeoutId = setTimeout(() => control.abort(), 15000);
-
-  let respuestaCruda;
-  try {
-    respuestaCruda = await fetch(urlLectura, { method: 'GET', signal: control.signal });
-  } catch (error) {
-    throw new Error('No hay conexión a internet en este momento. Intenta de nuevo cuando haya señal.');
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  let respuesta;
-  try {
-    respuesta = await respuestaCruda.json();
-  } catch (error) {
-    throw new Error('El enlace configurado no respondió como se esperaba. Revisa que el código de Apps Script (Code.gs) esté en su versión más reciente.');
-  }
-
-  if (!respuesta.ok) {
-    throw new Error(respuesta.error || 'Google Sheets no pudo devolver los datos.');
-  }
-
-  return {
-    cargues: respuesta.cargues || [],
-    paradas: respuesta.paradas || [],
-    checklist: respuesta.checklist || [],
-    descargues: respuesta.descargues || [],
-  };
-}
-
-// ---- Sincronización automática y silenciosa (Fase N11) -----------------------------------------------
-//
-// La llaman, sin esperar su resultado ni mostrar nada mientras corre, todas las acciones que guardan
-// algo importante. Si falla (sin señal, o el enlace aún no está configurado), el error se guarda en
-// config.ultimoErrorSheets para que el panel de "Google Sheets" en Herramientas lo pueda mostrar si el
-// supervisor quiere revisar por qué — pero nunca interrumpe el flujo del trabajo con una alerta.
-async function intentarSincronizarSheetsSilencioso() {
-  try {
-    await sincronizarConSheets();
-  } catch (error) {
-    await db.config.put({ clave: 'ultimoErrorSheets', valor: error.message || 'Error desconocido.' });
+  const filasParaEscribir = existentes.map((obj) =>
+    encabezados.map((campo) => (obj[campo] === undefined || obj[campo] === null ? '' : obj[campo]))
+  );
+  if (filasParaEscribir.length > 0) {
+    hoja.getRange(2, 1, filasParaEscribir.length, encabezados.length).setValues(filasParaEscribir);
   }
 }
+
+function responderJSON_(objeto) {
+  return ContentService.createTextOutput(JSON.stringify(objeto)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ---- POST: sube (mezcla) el histórico local de un celular -----------------
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+
+    // Un solo "candado" para toda la hoja: evita que dos celulares
+    // sincronizando justo al mismo tiempo se pisen entre sí.
+    const candado = LockService.getScriptLock();
+    if (!candado.tryLock(30000)) {
+      return responderJSON_({ ok: false, error: 'El sistema está ocupado en este momento, intenta de nuevo en unos segundos.' });
+    }
+    try {
+      upsertFilas_('Cargues', payload.cargues || []);
+      upsertFilas_('Paradas', payload.paradas || []);
+      upsertFilas_('Checklist', payload.checklist || []);
+      upsertFilas_('Descargues', payload.descargues || []);
+      SpreadsheetApp.flush();
+    } finally {
+      candado.releaseLock();
+    }
+    return responderJSON_({ ok: true });
+  } catch (error) {
+    return responderJSON_({ ok: false, error: error.message || 'Error desconocido en el servidor.' });
+  }
+}
+
+// ---- GET: entrega todo lo guardado (para el mezclado entre celulares) ----
+function doGet(e) {
+  try {
+    const parametros = (e && e.parameter) || {};
+    if (parametros.leer !== '1') {
+      return responderJSON_({ ok: true, info: 'Backend de sincronización Despachos Guapa activo.' });
+    }
+    const resultado = { ok: true };
+    NOMBRES_HOJAS.forEach((nombre) => {
+      const hoja = obtenerOCrearHoja_(nombre);
+      const encabezados = leerEncabezados_(hoja);
+      const clave = nombre.toLowerCase(); // 'cargues' | 'paradas' | 'checklist' | 'descargues'
+      resultado[clave] = leerFilasComoObjetos_(hoja, encabezados);
+    });
+    return responderJSON_(resultado);
+  } catch (error) {
+    return responderJSON_({ ok: false, error: error.message || 'Error desconocido en el servidor.' });
+  }
+}
+
