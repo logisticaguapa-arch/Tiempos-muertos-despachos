@@ -11,7 +11,7 @@
   nunca borra un cargue ni una parada ya guardados.
 */
 
-const CACHE_NOMBRE = 'piloto-guapa-v14';
+const CACHE_NOMBRE = 'piloto-guapa-v15';
 
 const ARCHIVOS_APP_SHELL = [
   './',
@@ -42,7 +42,24 @@ self.addEventListener('install', (evento) => {
   evento.waitUntil(
     caches
       .open(CACHE_NOMBRE)
-      .then((cache) => cache.addAll(ARCHIVOS_APP_SHELL))
+      .then((cache) =>
+        // IMPORTANTE (corregido tras un incidente real): antes esto usaba cache.addAll(...), que por
+        // dentro puede reusar una copia que el navegador ya tenía guardada en su caché HTTP normal —
+        // si esa copia quedó guardada justo en el ratito en que GitHub todavía no había terminado de
+        // publicar un archivo recién subido, la caché de la app se instalaba con esa versión vieja
+        // "congelada" y ya no se corregía sola aunque el archivo en GitHub quedara bien. Por eso ahora
+        // cada archivo se pide con { cache: 'reload' }, que obliga a ir SIEMPRE por una copia nueva de
+        // la red al instalar una versión — así una vez subido el archivo correcto a GitHub, la próxima
+        // instalación SIEMPRE lo agarra bien, sin depender de ese detalle de tiempo.
+        Promise.all(
+          ARCHIVOS_APP_SHELL.map((url) =>
+            fetch(url, { cache: 'reload' }).then((respuesta) => {
+              if (!respuesta.ok) throw new Error(`No se pudo precargar ${url} (${respuesta.status})`);
+              return cache.put(url, respuesta);
+            }),
+          ),
+        ),
+      )
       .catch((error) => {
         // Si un archivo del listado no existe (p.ej. se editó esta lista y quedó desactualizada),
         // no se debe romper la instalación completa del service worker por eso.
